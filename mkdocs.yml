@@ -1,0 +1,12 @@
+site_name: pfra-hydromet
+
+nav:
+    - Home: index.md
+    - About: about.md
+    - Changelog: CHANGELOG.md
+    - Contributing: CONTRIBUTING.md
+    - Setup: setup.md
+    - Quickstart: quickstart.md
+    - Core: core.md
+    
+theme: readthedocs
