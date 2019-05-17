@@ -106,7 +106,7 @@
         
             <li><a class="toctree-l3" href="#event-weight-table">Event Weight Table</a></li>
         
-            <li><a class="toctree-l3" href="#metada">Metada</a></li>
+            <li><a class="toctree-l3" href="#metadata">Metadata</a></li>
         
         </ul>
     
@@ -157,7 +157,7 @@
 <p><code>filenames and paths</code> for the precipitation frequency table, DataRepository, and location to save the outputs.</p>
 <p><code>Vector File</code> covering area of interest (hydraulic domain).</p>
 <p><code>NOAA data</code> Atlas 14 Volume number, region, and duration.</p>
-<p><code>CN</code> Curve Number calaculated for the area of interest.</p>
+<p><code>CN</code> Curve Number calculated for the area of interest.</p>
 <h4 id="convolution-parameters-epsilons">Convolution Parameters (*epsilons)</h4>
 <p><code>tempEpsilon</code> The number of hours over which to resample the incremental excess rainfall during the first convolution.</p>
 <p><code>tempEpsilon2</code> The number of hours over which to resample the incremental excess rainfall during the final convolution.</p>
@@ -166,7 +166,7 @@
 <p>*<em>Suggested epsilon values are given. Epsilon values should be adapted for each project area by analyzing the curve fitting
 results. Plots can be shown for every group by setting <code>display_plots=True</code></em></p>
 <h4 id="optional-features">Optional Features</h4>
-<p>Check functions for defalut options for using a known seed, testing, debuggging, etc. (e.g. <code>seed=88</code>)</p>
+<p>Check functions for default options for using a known seed, testing, debugging, etc. (e.g. <code>seed=88</code>)</p>
 <h2 id="example-outputs">Example Outputs</h2>
 <h3 id="preciptable">PrecipTable</h3>
 <p>Precipitation Frequency estimates for AOI.</p>
@@ -591,11 +591,11 @@ results. Plots can be shown for every group by setting <code>display_plots=True<
 </tr>
 </tbody>
 </table>
-<h3 id="metada">Metada</h3>
-<p>Additional data developed in intermediated calculations included for traceability/reporducibility.</p>
+<h3 id="metadata">Metadata</h3>
+<p>Additional data developed in intermediate calculations included for traceability/reproducibility.</p>
 <pre><code class="json">[{
     # Run Data (Event_Duration_Quartile_Decile_CurveNumber)
-    'RunInfo': 
+    'RunInfo':
 
             {'E60001': 'E1_6Hr_Q1_D10_CN79',
              'E60002': 'E2_6Hr_Q1_D90_CN78',
@@ -675,7 +675,7 @@ results. Plots can be shown for every group by setting <code>display_plots=True<
         }
 
 
-    # Test Statistic 
+    # Test Statistic
     'test_stat'
       {'E0001': [0.235358,
                  0.251304,
