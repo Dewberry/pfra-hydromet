@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  <link rel="shortcut icon" href="../img/favicon.ico">
+  <title>Quickstart - pfra-hydromet</title>
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../css/theme_extra.css" type="text/css" />
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css">
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Quickstart";
+    var mkdocs_page_input_path = "quickstart.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../js/modernizr-2.8.3.min.js" defer></script>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href=".." class="icon icon-home"> pfra-hydromet</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+	<ul class="current">
+	  
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="..">Home</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="../about/">About</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="../CHANGELOG/">Changelog</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="../CONTRIBUTING/">Contributing</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="../setup/">Setup</a>
+	    </li>
+          
+            <li class="toctree-l1 current">
+		
+    <a class="current" href="./">Quickstart</a>
+    <ul class="subnav">
+            
+    <li class="toctree-l2"><a href="#overview-of-tools">Overview of tools:</a></li>
+    
+
+    <li class="toctree-l2"><a href="#example-inputs">Example Inputs</a></li>
+    
+        <ul>
+        
+            <li><a class="toctree-l3" href="#convolution-parameters-epsilons">Convolution Parameters (*epsilons)</a></li>
+        
+            <li><a class="toctree-l3" href="#optional-features">Optional Features</a></li>
+        
+        </ul>
+    
+
+    <li class="toctree-l2"><a href="#example-outputs">Example Outputs</a></li>
+    
+        <ul>
+        
+            <li><a class="toctree-l3" href="#preciptable">PrecipTable</a></li>
+        
+            <li><a class="toctree-l3" href="#random-events-table">Random Events Table</a></li>
+        
+            <li><a class="toctree-l3" href="#curve-number-table">Curve Number Table</a></li>
+        
+            <li><a class="toctree-l3" href="#final-events-table">Final Events Table</a></li>
+        
+            <li><a class="toctree-l3" href="#event-weight-table">Event Weight Table</a></li>
+        
+            <li><a class="toctree-l3" href="#metada">Metada</a></li>
+        
+        </ul>
+    
+
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="../core/">Core</a>
+	    </li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="..">pfra-hydromet</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="..">Docs</a> &raquo;</li>
+    
+      
+    
+    <li>Quickstart</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h2 id="overview-of-tools">Overview of tools:</h2>
+<p>Example input and output parameters/files.</p>
+<h2 id="example-inputs">Example Inputs</h2>
+<p><code>filenames and paths</code> for the precipitation frequency table, DataRepository, and location to save the outputs.</p>
+<p><code>Vector File</code> covering area of interest (hydraulic domain).</p>
+<p><code>NOAA data</code> Atlas 14 Volume number, region, and duration.</p>
+<p><code>CN</code> Curve Number calaculated for the area of interest.</p>
+<h4 id="convolution-parameters-epsilons">Convolution Parameters (*epsilons)</h4>
+<p><code>tempEpsilon</code> The number of hours over which to resample the incremental excess rainfall during the first convolution.</p>
+<p><code>tempEpsilon2</code> The number of hours over which to resample the incremental excess rainfall during the final convolution.</p>
+<p><code>convEpsilon</code> The maximum allowable percent difference in incremental excess between two event at any given resampled timestep.</p>
+<p><code>volEpsilon</code> The maximum allowable percent difference between the two events total runoff volume.</p>
+<p>*<em>Suggested epsilon values are given. Epsilon values should be adapted for each project area by analyzing the curve fitting
+results. Plots can be shown for every group by setting <code>display_plots=True</code></em></p>
+<h4 id="optional-features">Optional Features</h4>
+<p>Check functions for defalut options for using a known seed, testing, debuggging, etc. (e.g. <code>seed=88</code>)</p>
+<h2 id="example-outputs">Example Outputs</h2>
+<h3 id="preciptable">PrecipTable</h3>
+<p>Precipitation Frequency estimates for AOI.</p>
+<table>
+<thead>
+<tr>
+<th align="center">Tr</th>
+<th align="center">Lower 90%</th>
+<th align="center">Expected Value</th>
+<th align="center">Upper 90%</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center">2</td>
+<td align="center">5.25</td>
+<td align="center">6.32</td>
+<td align="center">7.60</td>
+</tr>
+<tr>
+<td align="center">5</td>
+<td align="center">6.85</td>
+<td align="center">8.27</td>
+<td align="center">9.96</td>
+</tr>
+<tr>
+<td align="center">10</td>
+<td align="center">8.20</td>
+<td align="center">9.95</td>
+<td align="center">12.05</td>
+</tr>
+<tr>
+<td align="center">25</td>
+<td align="center">10.06</td>
+<td align="center">12.45</td>
+<td align="center">15.86</td>
+</tr>
+<tr>
+<td align="center">50</td>
+<td align="center">11.48</td>
+<td align="center">14.56</td>
+<td align="center">18.75</td>
+</tr>
+<tr>
+<td align="center">100</td>
+<td align="center">12.85</td>
+<td align="center">16.86</td>
+<td align="center">22.22</td>
+</tr>
+<tr>
+<td align="center">200</td>
+<td align="center">14.20</td>
+<td align="center">19.33</td>
+<td align="center">26.19</td>
+</tr>
+<tr>
+<td align="center">500</td>
+<td align="center">16.20</td>
+<td align="center">22.89</td>
+<td align="center">31.84</td>
+</tr>
+<tr>
+<td align="center">1000</td>
+<td align="center">17.71</td>
+<td align="center">25.79</td>
+<td align="center">36.11</td>
+</tr>
+</tbody>
+</table>
+<h3 id="random-events-table">Random Events Table</h3>
+<p>Randomly chosen events &amp; metadata before convolution.</p>
+<table>
+<thead>
+<tr>
+<th align="center">Return Period</th>
+<th align="center">Ann. Exc. Prob.</th>
+<th align="center">ARI</th>
+<th align="center">Log10_ARI</th>
+<th align="center">Expected Value</th>
+<th align="center">Lower (90%)</th>
+<th align="center">Upper (90%)</th>
+<th align="center">Quartile</th>
+<th align="center">Sigma</th>
+<th align="center">Fitted Lower (90%) Limit</th>
+<th align="center">Fitted Upper (90%) Limit</th>
+<th align="center">Random Precipitation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center">2.000240382</td>
+<td align="center">0.499939912</td>
+<td align="center">1.442945202</td>
+<td align="center">0.366686304</td>
+<td align="center">3.15751785</td>
+<td align="center">2.876612547</td>
+<td align="center">3.507262528</td>
+<td align="center">3</td>
+<td align="center">0.078317368</td>
+<td align="center">2.855989829</td>
+<td align="center">3.49088042</td>
+<td align="center">3.308578113</td>
+</tr>
+<tr>
+<td align="center">2.001189958</td>
+<td align="center">0.499702687</td>
+<td align="center">1.44393337</td>
+<td align="center">0.367370897</td>
+<td align="center">3.157996455</td>
+<td align="center">2.877045943</td>
+<td align="center">3.507791811</td>
+<td align="center">3</td>
+<td align="center">0.078224163</td>
+<td align="center">2.856763942</td>
+<td align="center">3.490992541</td>
+<td align="center">3.331452983</td>
+</tr>
+<tr>
+<td align="center">2.00267425</td>
+<td align="center">0.49933233</td>
+<td align="center">1.445477879</td>
+<td align="center">0.368439979</td>
+<td align="center">3.158744005</td>
+<td align="center">2.877722879</td>
+<td align="center">3.508618516</td>
+<td align="center">3</td>
+<td align="center">0.078224124</td>
+<td align="center">2.857440325</td>
+<td align="center">3.491818745</td>
+<td align="center">3.453517084</td>
+</tr>
+<tr>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+</tr>
+<tr>
+<td align="center">923.2492014</td>
+<td align="center">0.001083131</td>
+<td align="center">922.749111</td>
+<td align="center">6.827357379</td>
+<td align="center">13.55155136</td>
+<td align="center">11.4917289</td>
+<td align="center">14.67457848</td>
+<td align="center">3</td>
+<td align="center">0.087869372</td>
+<td align="center">12.10830888</td>
+<td align="center">15.16682025</td>
+<td align="center">12.88399871</td>
+</tr>
+<tr>
+<td align="center">1119.173615</td>
+<td align="center">0.000893516</td>
+<td align="center">1118.67354</td>
+<td align="center">7.019898923</td>
+<td align="center">14.11398151</td>
+<td align="center">11.92280701</td>
+<td align="center">15.27555124</td>
+<td align="center">3</td>
+<td align="center">0.088696172</td>
+<td align="center">12.59748493</td>
+<td align="center">15.81303532</td>
+<td align="center">14.49259104</td>
+</tr>
+<tr>
+<td align="center">3000</td>
+<td align="center">0.000333333</td>
+<td align="center">2999.499972</td>
+<td align="center">8.006200878</td>
+<td align="center">17.38236261</td>
+<td align="center">14.3978362</td>
+<td align="center">18.76211492</td>
+<td align="center">3</td>
+<td align="center">0.092819505</td>
+<td align="center">15.43292272</td>
+<td align="center">19.57804981</td>
+<td align="center">18.76211492</td>
+</tr>
+</tbody>
+</table>
+<h3 id="curve-number-table">Curve Number Table</h3>
+<p>Randomly chosen CN number and metadata.</p>
+<table>
+<thead>
+<tr>
+<th align="center">Random Sample</th>
+<th align="center">Lower</th>
+<th align="center">Expected Value</th>
+<th align="center">Upper</th>
+<th align="center">Sigma</th>
+<th align="center">Fitted Lower Limit</th>
+<th align="center">Fitted Upper Limit</th>
+<th align="center">Random CN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center">1</td>
+<td align="center">67</td>
+<td align="center">83</td>
+<td align="center">93</td>
+<td align="center">0.116325785</td>
+<td align="center">71.50469526</td>
+<td align="center">96.34332368</td>
+<td align="center">88</td>
+</tr>
+<tr>
+<td align="center">2</td>
+<td align="center">67</td>
+<td align="center">83</td>
+<td align="center">93</td>
+<td align="center">0.116325785</td>
+<td align="center">71.50469526</td>
+<td align="center">96.34332368</td>
+<td align="center">89</td>
+</tr>
+<tr>
+<td align="center">3</td>
+<td align="center">67</td>
+<td align="center">83</td>
+<td align="center">93</td>
+<td align="center">0.116325785</td>
+<td align="center">71.50469526</td>
+<td align="center">96.34332368</td>
+<td align="center">93</td>
+</tr>
+<tr>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+</tr>
+<tr>
+<td align="center">5107</td>
+<td align="center">67</td>
+<td align="center">83</td>
+<td align="center">93</td>
+<td align="center">0.116325785</td>
+<td align="center">71.50469526</td>
+<td align="center">96.34332368</td>
+<td align="center">90</td>
+</tr>
+<tr>
+<td align="center">5108</td>
+<td align="center">67</td>
+<td align="center">83</td>
+<td align="center">93</td>
+<td align="center">0.116325785</td>
+<td align="center">71.50469526</td>
+<td align="center">96.34332368</td>
+<td align="center">87</td>
+</tr>
+<tr>
+<td align="center">5109</td>
+<td align="center">67</td>
+<td align="center">83</td>
+<td align="center">93</td>
+<td align="center">0.116325785</td>
+<td align="center">71.50469526</td>
+<td align="center">96.34332368</td>
+<td align="center">93</td>
+</tr>
+</tbody>
+</table>
+<h3 id="final-events-table">Final Events Table</h3>
+<p>Final events to be modeled.</p>
+<table>
+<thead>
+<tr>
+<th align="center">hours</th>
+<th align="center">E0001</th>
+<th align="center">E0002</th>
+<th align="center">E0003</th>
+<th align="center">...</th>
+<th align="center">E0395</th>
+<th align="center">E0396</th>
+<th align="center">E0397</th>
+<th align="center">E0398</th>
+<th align="center">E0399</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">...</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center">0.5</td>
+<td align="center">0.010</td>
+<td align="center">0.0047</td>
+<td align="center">0.0030</td>
+<td align="center">...</td>
+<td align="center">0.01359</td>
+<td align="center">0.01038</td>
+<td align="center">0.00674</td>
+<td align="center">0.00234</td>
+<td align="center">0.00555</td>
+</tr>
+<tr>
+<td align="center">1</td>
+<td align="center">0.013</td>
+<td align="center">0.00948</td>
+<td align="center">0.0043</td>
+<td align="center">...</td>
+<td align="center">0.0447</td>
+<td align="center">0.0584</td>
+<td align="center">0.0124</td>
+<td align="center">0.00356</td>
+<td align="center">0.008906</td>
+</tr>
+<tr>
+<td align="center">1.5</td>
+<td align="center">0.10</td>
+<td align="center">0.067680</td>
+<td align="center">0.0294</td>
+<td align="center">...</td>
+<td align="center">0.1660</td>
+<td align="center">0.15102</td>
+<td align="center">0.1220</td>
+<td align="center">0.0198</td>
+<td align="center">0.0433</td>
+</tr>
+<tr>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+<td align="center">...</td>
+</tr>
+<tr>
+<td align="center">22</td>
+<td align="center">0.13</td>
+<td align="center">0.1534</td>
+<td align="center">0.0807</td>
+<td align="center">...</td>
+<td align="center">0.1878</td>
+<td align="center">0.1707</td>
+<td align="center">0.234</td>
+<td align="center">0.07389</td>
+<td align="center">0.149328</td>
+</tr>
+<tr>
+<td align="center">23.5</td>
+<td align="center">0.103</td>
+<td align="center">0.21576</td>
+<td align="center">0.14100</td>
+<td align="center">...</td>
+<td align="center">0.1373</td>
+<td align="center">0.1408</td>
+<td align="center">0.317</td>
+<td align="center">0.15162</td>
+<td align="center">0.221391</td>
+</tr>
+<tr>
+<td align="center">24</td>
+<td align="center">0.08732</td>
+<td align="center">0.25004</td>
+<td align="center">0.1836</td>
+<td align="center">...</td>
+<td align="center">0.1132</td>
+<td align="center">0.1293</td>
+<td align="center">0.3403</td>
+<td align="center">0.2053</td>
+<td align="center">0.2430</td>
+</tr>
+</tbody>
+</table>
+<h3 id="event-weight-table">Event Weight Table</h3>
+<table>
+<thead>
+<tr>
+<th align="center"></th>
+<th align="center">Weight</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center">E0001</td>
+<td align="center">0.006207654</td>
+</tr>
+<tr>
+<td align="center">E0002</td>
+<td align="center">0.005313752</td>
+</tr>
+<tr>
+<td align="center">...</td>
+<td align="center">...</td>
+</tr>
+<tr>
+<td align="center">E0964</td>
+<td align="center">0.000019172</td>
+</tr>
+<tr>
+<td align="center">E0965</td>
+<td align="center">0.000071544</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metada">Metada</h3>
+<p>Additional data developed in intermediated calculations included for traceability/reporducibility.</p>
+<pre><code class="json">[{
+    # Run Data (Event_Duration_Quartile_Decile_CurveNumber)
+    'RunInfo': 
+
+            {'E60001': 'E1_6Hr_Q1_D10_CN79',
+             'E60002': 'E2_6Hr_Q1_D90_CN78',
+             ...}
+
+    # Cumulative (raw) precipitation time-series
+    'precip':  
+
+            {'E60001': {'0.0': 0.0,
+                        '0.5': 0.8010830472988398,
+                        '1.0': 1.4541398793359375,
+                        '1.5': 1.8372665541310351,
+                        '2.0': 2.057129020916858,
+                        '2.5': 2.1550875457224223,
+                        '3.0': 2.170325538469955,
+                        '3.5': 2.176856106790326,
+                        '4.0': 2.176856106790326,
+                        '4.5': 2.176856106790326,
+                        '5.0': 2.176856106790326,
+                        '5.5': 2.176856106790326,
+                        '6.0': 2.176856106790326},
+             'E60002': { ...
+             }
+
+
+    # Cumulative excess-precipitation time-series
+    'cum_excess':
+
+            {'E60001': {'0.0': 0.0,
+                        '0.5': 0.02479673948334961,
+                        '1.0': 0.23766036959891948,
+                        '1.5': 0.4300482251417235,
+                        '2.0': 0.5562285716308201,
+                        '2.5': 0.6155457935761868,
+                        '3.0': 0.6249312656222388,
+                        '3.5': 0.6289662984090281,
+                        '4.0': 0.6289662984090281,
+                        '4.5': 0.6289662984090281,
+                        '5.0': 0.6289662984090281,
+                        '5.5': 0.6289662984090281,
+                        '6.0': 0.6289662984090281},
+             'E60002': { ...
+             }
+
+    # Incremental excess-precipitation time-series
+    'incr_excess'
+
+            {'E60001': {'0.0': 0.0,
+                        '0.5': 0.02479673948334961,
+                        '1.0': 0.21286363011556986,
+                        '1.5': 0.19238785554280402,
+                        '2.0': 0.1261803464890966,
+                        '2.5': 0.059317221945366705,
+                        '3.0': 0.009385472046052001,
+                        '3.5': 0.004035032786789294,
+                        '4.0': 0.0,
+                        '4.5': 0.0,
+                        '5.0': 0.0,
+                        '5.5': 0.0,
+                        '6.0': 0.0},
+
+             'E60002': { ...
+             }
+
+    # Curve groups (similar excess-precipitation time-series)
+    'groups'
+
+        {'E0001': ['E60002',
+                   'E60930',
+                   'E60551',
+                      ...  ,
+                    E64421',
+                    E64423',
+                   'E64483'],
+         'E0002': [...
+         ]
+        }
+
+
+    # Test Statistic 
+    'test_stat'
+      {'E0001': [0.235358,
+                 0.251304,
+                 0.214125,
+                    ...
+                 0.18715,
+                 0.184935,
+                 0.174473],
+       'E0002': [...
+     ]
+}]
+</code></pre>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../core/" class="btn btn-neutral float-right" title="Core">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../setup/" class="btn btn-neutral" title="Setup"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../setup/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../core/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '..';</script>
+    <script src="../js/theme.js" defer></script>
+      <script src="../search/main.js" defer></script>
+
+</body>
+</html>
