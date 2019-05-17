@@ -89,4 +89,4 @@ and can be adopted into the tool with minor modifications.
 
 ### Documentation
 
-Complete project documentation can be found in [read the docs]().
+Complete project documentation can be found in [read the docs](https://dewberry.github.io/pfra-hydromet/).
