@@ -1,5 +1,8 @@
 # docs biuild files
 site/
+Inputs/
+Outputs/
+Notebooks/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
