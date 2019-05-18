@@ -13,3 +13,4 @@ scipy     ==1.1.0
 scrapbook-beta == 0.1.0            
 urllib3   ==1.24.2  
 descartes
+xlrd
