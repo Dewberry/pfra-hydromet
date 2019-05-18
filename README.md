@@ -1,3 +1,5 @@
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/Dewberry/pfra-hydromet/master)
+
 # Description
 
 __pfra-hydromet__ is a collection of tools for developing excess precipitation scenarios
