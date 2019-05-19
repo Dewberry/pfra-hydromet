@@ -12,7 +12,7 @@ Example input and output parameters/files.
 
 `NOAA data` Atlas 14 Volume number, region, and duration.
 
-`CN` Curve Number calaculated for the area of interest.
+`CN` Curve Number calculated for the area of interest.
 
 #### Convolution Parameters (*epsilons)
 
@@ -22,7 +22,7 @@ Example input and output parameters/files.
 `tempEpsilon2` The number of hours over which to resample the incremental excess rainfall during the final convolution.
 
 
-`convEpsilon` The maximum allowable percent difference in incremental excess between two event at any given resampled timestep.
+`convEpsilon` The maximum allowable percent difference in incremental excess between two event at any given resampled time step.
 
 
 `volEpsilon` The maximum allowable percent difference between the two events total runoff volume.
@@ -33,7 +33,7 @@ results. Plots can be shown for every group by setting `display_plots=True`*
 
 #### Optional Features
 
-Check functions for defalut options for using a known seed, testing, debuggging, etc. (e.g. `seed=88`)
+Check functions for default options for using a known seed, testing, debugging, etc. (e.g. `seed=88`)
 
 
 
@@ -112,9 +112,9 @@ Final events to be modeled.
 |E0965 |0.000071544|
 
 
-### Metada
+### Metadata
 
-Additional data developed in intermediated calculations included for traceability/reporducibility.
+Additional data developed in intermediated calculations included for traceability/reproducibility.
 
 
 ```json

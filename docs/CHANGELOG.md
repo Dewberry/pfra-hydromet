@@ -1,6 +1,16 @@
 Changelog
 =========
 
+0.10.1
+------
+
+**General**
+ - Binder build tested and linked to readme. 
+
+**Tests** 
+ - Added unit test example for core.hydromet.
+
+
 0.10.0
 ------
 
