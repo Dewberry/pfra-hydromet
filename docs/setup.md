@@ -23,6 +23,7 @@ Required libraries and suggested versions:
 |python     |3.7.1|
 |rasterio   |1.0.13|      
 |scipy      |1.1.0 |               
-|scrapbook  |0.2.0 |          
-|urllib3    |1.24.1|  
-
+|scrapbook-beta  |0.1.0 |          
+|urllib3    |1.24.2|  
+|descartes||
+|xlrd||

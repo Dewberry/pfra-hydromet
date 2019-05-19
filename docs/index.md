@@ -10,5 +10,5 @@ Welcome to the __*pfra-hydromet*__ documentation page!
 
 ## Tools
 
-* `Notebooks` Execution enviornment for code.
+* `Notebooks` Execution environment for code.
 * `Core`      Core code called by notebooks.
