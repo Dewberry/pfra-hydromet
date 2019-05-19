@@ -161,7 +161,7 @@
 <h4 id="convolution-parameters-epsilons">Convolution Parameters (*epsilons)</h4>
 <p><code>tempEpsilon</code> The number of hours over which to resample the incremental excess rainfall during the first convolution.</p>
 <p><code>tempEpsilon2</code> The number of hours over which to resample the incremental excess rainfall during the final convolution.</p>
-<p><code>convEpsilon</code> The maximum allowable percent difference in incremental excess between two event at any given resampled timestep.</p>
+<p><code>convEpsilon</code> The maximum allowable percent difference in incremental excess between two event at any given resampled time step.</p>
 <p><code>volEpsilon</code> The maximum allowable percent difference between the two events total runoff volume.</p>
 <p>*<em>Suggested epsilon values are given. Epsilon values should be adapted for each project area by analyzing the curve fitting
 results. Plots can be shown for every group by setting <code>display_plots=True</code></em></p>
@@ -592,10 +592,10 @@ results. Plots can be shown for every group by setting <code>display_plots=True<
 </tbody>
 </table>
 <h3 id="metadata">Metadata</h3>
-<p>Additional data developed in intermediate calculations included for traceability/reproducibility.</p>
+<p>Additional data developed in intermediated calculations included for traceability/reproducibility.</p>
 <pre><code class="json">[{
     # Run Data (Event_Duration_Quartile_Decile_CurveNumber)
-    'RunInfo':
+    'RunInfo': 
 
             {'E60001': 'E1_6Hr_Q1_D10_CN79',
              'E60002': 'E2_6Hr_Q1_D90_CN78',
@@ -675,7 +675,7 @@ results. Plots can be shown for every group by setting <code>display_plots=True<
         }
 
 
-    # Test Statistic
+    # Test Statistic 
     'test_stat'
       {'E0001': [0.235358,
                  0.251304,

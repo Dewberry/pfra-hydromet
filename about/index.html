@@ -62,7 +62,7 @@
     
         <ul>
         
-            <li><a class="toctree-l3" href="#randomly-select-recurrance-intervals-and-precipitation-amounts">Randomly Select Recurrance Intervals and Precipitation Amounts</a></li>
+            <li><a class="toctree-l3" href="#randomly-select-recurrence-intervals-and-precipitation-amounts">Randomly Select Recurrence Intervals and Precipitation Amounts</a></li>
         
             <li><a class="toctree-l3" href="#randomly-pair-event-precipitation-total-with-a-decile">Randomly pair event (precipitation total) with a decile</a></li>
         
@@ -142,14 +142,14 @@
             <div class="section">
               
                 <h1 id="overview">Overview</h1>
-<p>Excess rainfall is calculated by first randomly selecting a precipitation recurrance interval and corresponding precipitation amount, precipitation temporal distribution, and curve number for the area of interest. The randomly selected precipitation data and curve number are then used by the curve number approach to calculate the excess rainfall amount for the corresponding recurrance interval. The procedure is repeated for the specified number of events/recurrance intervals. The incremental excess rainfall curves are grouped based on a novel test statistic that quantifies the incremental and cumulative volumentric differences between two curves. The mean of each group of curves is calculated and used in place of the original set of curves in order to improve modeling efficiency by reducing redundancy. Weights are assigned for each final event.</p>
-<h3 id="randomly-select-recurrance-intervals-and-precipitation-amounts">Randomly Select Recurrance Intervals and Precipitation Amounts</h3>
+<p>Excess rainfall is calculated by first randomly selecting a precipitation recurrence interval and corresponding precipitation amount, precipitation temporal distribution, and curve number for the area of interest. The randomly selected precipitation data and curve number are then used by the curve number approach to calculate the excess rainfall amount for the corresponding recurrence interval. The procedure is repeated for the specified number of events/recurrence intervals. The incremental excess rainfall curves are grouped based on a novel test statistic that quantifies the incremental and cumulative volumetric differences between two curves. The mean of each group of curves is calculated and used in place of the original set of curves in order to improve modeling efficiency by reducing redundancy. Weights are assigned for each final event.</p>
+<h3 id="randomly-select-recurrence-intervals-and-precipitation-amounts">Randomly Select Recurrence Intervals and Precipitation Amounts</h3>
 <p>For each quartile of the precipitation temporal distributions:</p>
 <ul>
-<li>Randomly select precipitation recurrance intervals</li>
-<li>Calculate the expected value, lower confidence limit, and upper confidence limit for each recurrance interval</li>
-<li>Calculate the standard devation of the log-normal distribution using the lower/upper confidence limits at each recurrance interval</li>
-<li>Randomly select a precipitation amount from the calibrated log-normal distributuion at each recurrance interval</li>
+<li>Randomly select precipitation recurrence intervals</li>
+<li>Calculate the expected value, lower confidence limit, and upper confidence limit for each recurrence interval</li>
+<li>Calculate the standard deviation of the log-normal distribution using the lower/upper confidence limits at each recurrence interval</li>
+<li>Randomly select a precipitation amount from the calibrated log-normal distribution at each recurrence interval</li>
 </ul>
 <p><img alt="" src="../img/vol_samples.PNG" /></p>
 <h3 id="randomly-pair-event-precipitation-total-with-a-decile">Randomly pair event (precipitation total) with a decile</h3>
@@ -158,14 +158,14 @@
 <h3 id="randomly-select-curve-numbers">Randomly Select Curve Numbers</h3>
 <ul>
 <li>Add the lower and upper values of the specified curve number to a table.</li>
-<li>Calculate the standard devation of the log-normal distribution for the curve number using the lower and upper values.</li>
-<li>Randomly select a curve number from the calibrated log-normal distributuion at each recurrance interval.</li>
+<li>Calculate the standard deviation of the log-normal distribution for the curve number using the lower and upper values.</li>
+<li>Randomly select a curve number from the calibrated log-normal distribution at each recurrence interval.</li>
 </ul>
 <h3 id="calculate-excess-rainfall">Calculate Excess Rainfall</h3>
 <p><img alt="" src="../img/cum_runoff.PNG" /></p>
 <h3 id="convert-excess-rainfall-to-incremental">Convert Excess Rainfall to Incremental</h3>
 <ul>
-<li>To reduce the number of hydraulic simulations necssary, group like cuves in the next step</li>
+<li>To reduce the number of hydraulic simulations necessary, group like curves in the next step</li>
 </ul>
 <p><img alt="" src="../img/incr_curves.PNG" /></p>
 <h3 id="perform-convolution-tests">Perform Convolution Tests</h3>
