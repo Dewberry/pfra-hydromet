@@ -48,6 +48,8 @@ regional datasets to a uniform csv format.
 Handbook [Chapter 10](https://www.wcc.nrcs.usda.gov/ftpref/wntsc/H&H/NEHhydrology/ch10.pdf.) listing
 CN values over differing antecedent moisture conditions.
 
+- `NOAA_Atlas_Volume_Codes.json` maps the NOAA Atlas 14 volume number to the volume code. [Source](https://hdsc.nws.noaa.gov/hdsc/pfds/pfds_gis.html)
+
 *The ([CN Method](https://www.nrcs.usda.gov/Internet/FSE_DOCUMENTS/stelprdb1044171.pdf))
 is currently the only transform method in use for this project. Other transforms are available
 and can be adopted into the tool with minor modifications.
