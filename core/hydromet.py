@@ -48,6 +48,19 @@ geoDF = 'GeoDataFrame'
 #---------------------------------------------------------------------------#
 
 
+def get_volume_code(datarepository_dir: str, vol_code_filename: str, 
+                                        vol: int, sub_vol: int = None) -> str:
+    ''' Extracts the NOAA Atlas 14 volume code for the specified volume number.
+    '''
+    if vol==5: assert sub_vol!=None, 'For Volume 5, specify sub-volume number'
+    with open(datarepository_dir/vol_code_filename) as json_file:  
+        vol_code = json.load(json_file)
+    code = vol_code[str(vol)]
+    if vol == 5: code = code[str(sub_vol)]
+    print('NOAA Atlas 14 Volume Code:', code)
+    return code
+
+
 def parse_filename(zip_name: str, reg: str) -> dict:
     '''Builds a dictionary with the region, recurrance interval, duration, 
        and statistic type using the zip_name and region.
