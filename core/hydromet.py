@@ -108,7 +108,6 @@ def get_temporals(temporal_dir: str, vol: int, reg: int, dur: int,
        are dropped. Data was downloaded from:
        https://hdsc.nws.noaa.gov/hdsc/pfds/pfds_temporal.html
     '''
-    #assert vol in [2, 9], "Temporal data not QCed, check data structure"
     f = 'Temporals_Volume{0}_Region{1}_Duration{2}.csv'.format(vol, reg, dur)
     path = temporal_dir/f
     s = qmap['skiprows']
@@ -879,6 +878,78 @@ def Rename_Final_Groups(curve_weight: dict, dur: int) -> dict:
                 rename_map[k] = ID 
                 num+=1
     return rename_map    
+
+
+def determine_tstep_units(incr_excess: pd.DataFrame) -> dict:
+    '''Determines the timestep and the timestep's units of the incremental
+       excess runoff.
+    '''
+    assert incr_excess.index.name == 'hours', 'Timestep and timesteps units' 
+    'cannot be calculated if the runoff duration is not in units of hours'
+    tstep = incr_excess.index[-1]/(incr_excess.shape[0]-1)
+    dic = {}
+    if tstep < 1.0:        
+        dic[int(60.0*tstep)] = 'MIN' 
+    elif tstep >= 1.0:
+        dic[int(tstep)] = 'HOUR'
+    else:
+        print('Timestep and timestep units were not determined')
+    return dic
+
+
+def dss_map(outputs_dir: str, var: str, tstep: int, tstep_units: str,
+                units: str, dtype: str='INST-VAL', IMP: str='DSS_MAP.input', 
+                                        to_dss: str='ToDSS.input') -> None:
+    '''Creates a map file containing the data structure for DSSUTL.EXE.
+    '''
+    var8 = var[:8]
+    ts = '{0}{1}'.format(tstep, tstep_units)
+    output_file = outputs_dir/IMP
+    datastring = "EV {0}=///{0}//{1}// UNITS={2} TYPE={3}\nEF [APART] [BPART] [DATE] [TIME] [{0}]\nIMP {4}".format(var8, ts, units, dtype, to_dss)
+    with open(output_file, 'w') as f: 
+        f.write(datastring)
+    return None
+
+
+def excess_df_to_input(outputs_dir: str, df: pd.DataFrame, tstep: float,
+        tstep_units: str, scen_name: str, to_dss: str='ToDSS.input') -> None:
+    '''Writes the excess rainfall dataframe to an input file according to the 
+       struture specified within DSS_MAP.input.
+    '''
+    temp_data_file = outputs_dir/to_dss
+    cols = df.columns.tolist()
+    start_date = datetime.combine(datetime.now().date(), datetime.min.time())
+    with open(temp_data_file, 'w') as f:
+        for i, col in enumerate(cols):
+            m_dtm = start_date
+            event_data = df[col]
+            for j, idx in enumerate(event_data.index):
+                if j > 0: m_dtm+=pd.Timedelta(hours = tstep)
+                htime_string = datetime.strftime(m_dtm, '%d%b%Y %H%M')
+                runoff = event_data.loc[idx]
+                f.write('"{}"'.format(scen_name)+' '+col+' '+htime_string+' '+str(runoff)+'\n')
+    return None
+
+
+def make_dss_file(outputs_dir: str, bin_dir: str, dssutil: str, 
+                        dss_filename: str, IMP: str='DSS_MAP.input',
+                to_dss: str='ToDSS.input', remove_temp_files: bool=True, 
+                                        display_print: bool = True) -> None:
+    '''Runs the DSSUTL executable using the DSS_MAP.input file to map the 
+       excess rainfall data from the ToDSS.input file and saves the results
+       to a dss file.
+    '''
+    shutil.copy(bin_dir/dssutil, outputs_dir)
+    os.chdir(outputs_dir)
+    os.system("{0} {1}.dss INPUT={2}".format(dssutil, dss_filename, IMP))
+    time.sleep(5)
+    if remove_temp_files:
+        os.remove(outputs_dir/IMP)
+        os.remove(outputs_dir/dssutil)
+        os.remove(outputs_dir/to_dss)
+    filepath = outputs_dir/dss_filename
+    if display_print: print('Dss File written to {0}.dss'.format(filepath))
+    return None
 
 
 def dic_key_to_str(orig_dic: dict) -> dict:
