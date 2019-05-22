@@ -2,12 +2,13 @@ import os
 import io
 import re
 import json
+import time
 import urllib
+import shutil
 import operator
 import warnings
 warnings.filterwarnings('ignore')
 import pathlib as pl
-from time import time
 import scrapbook as sb
 from zipfile import ZipFile
 from datetime import datetime
