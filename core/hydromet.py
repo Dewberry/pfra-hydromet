@@ -311,12 +311,11 @@ def find_optimal_curve_std(df: pd.DataFrame, lower: str=r'Lower (90%)',
     return df
 
 
-def RandomizeData(df: pd.DataFrame, number: int, outputs_dir: str, AOI: str, 
-        dur: int, tempE: int, convE: float, volE: float, quartile: int=None, 
-                            seed: int=None, sampling_distro: str='Lognorm', 
+def RandomizeData(df: pd.DataFrame, number: int, outputs_dir: str, 
+    filename: str, dur: int, seed: int=None, sampling_distro: str='Lognorm',
                     variable: str='Precipitation', lower: str=r'Lower (90%)', 
                                 upper: str=r'Upper (90%)', plot: bool=False, 
-                                    display_print: bool=True) -> pd.DataFrame:
+                                display_print: bool=True) -> pd.DataFrame:
     '''Randomly selects a value (precipitation or curve number) from the log-
        normal distribution given the expected value and optimized standard 
        devation for each recurrance interval/event.
@@ -345,17 +344,17 @@ def RandomizeData(df: pd.DataFrame, number: int, outputs_dir: str, AOI: str,
     rand_data = [col for col in df.columns.tolist() if 'Random' in col]
     if os.path.isdir(outputs_dir)==False:
         os.mkdir(outputs_dir)
-    if variable == 'Precipitation': 
-        fn = "Precip_Q{0}_{1}_Dur{2}_tempE{3}_convE{4}_volE{5}_Se{6}.csv".format(quartile, AOI, dur, tempE, convE, volE, seed)
-        if display_print: 
-            print('Seed - Precipitation:', seed)
+    if variable=='Precipitation': 
+        df_rename = df.copy()
+        df_rename.index.name ='Tr'
     elif variable == 'CN':
-        fn = "CN_{0}_Dur{1}_tempE{2}_convE{3}_volE{4}_Se{5}.csv".format(AOI, dur, tempE, convE, volE, seed)
+        df_rename = df.copy()
+        df_rename.index.name ='E'
         if display_print: 
-            print('Seed - CN:', seed)
-            print(display(df[rand_data].head(2)))
-    df.to_csv(outputs_dir/'Rand_{}'.format(fn)) 
-
+            print(display(df[rand_data].head(2)))    
+    df_rename.to_csv(outputs_dir/filename) 
+    if display_print: 
+            print('{0} - Seed:'.format(variable), seed) 
     if plot: plot_rand_precip_data(df, rand_data, dur)
     return df[rand_data]
 
@@ -448,7 +447,7 @@ def populate_event_precip_data(random_cns: pd.DataFrame,
        distribution, and curve number. 
     '''
     precip_data = random_precip_table.copy()
-    events_log = pd.DataFrame()
+    events_log = {}
     runids = []
     simID = int(str(dur)+'0000')
     output_precip_data = pd.DataFrame(index = curve_group['q1'].index) 
@@ -961,6 +960,45 @@ def dic_key_to_str(orig_dic: dict) -> dict:
     for k in orig_dic.keys():
         dic_str[str(k)]=orig_dic[k]
     return dic_str
+
+
+def extract_event_metadata(outfiles: list, outputs_dir: str, 
+                                remove_intermediates: bool = True) -> dict:
+    '''Loads all of the intermediate metadata files created during the 
+       randomization steps and saves them to a single dictionary.
+    '''
+    for f in outfiles:
+        file = outputs_dir/f
+        df = pd.read_csv(file)
+        if remove_intermediates:
+            os.remove(file)
+        if 'Rand_Precip' in f:
+            if 'Q1' in f: dfQ1 = df.copy()
+            if 'Q2' in f: dfQ2 = df.copy()
+            if 'Q3' in f: dfQ3 = df.copy()
+            if 'Q4' in f: dfQ4 = df.copy()
+        elif 'Rand_CN' in f:
+            dfCN = df.set_index('E').copy()
+    dfQ = pd.concat([dfQ1, dfQ2, dfQ3, dfQ4])
+    dfQ['E'] = np.arange(1, len(dfQ)+1)
+    dfQ = dfQ.set_index('E')
+    new_col = []
+    for col in list(dfCN.columns):
+        if 'CN' not in col:
+            new_col.append(col+' CN')
+        else:
+            new_col.append(col)   
+    dfCN.columns = new_col
+    dfcomb = dfQ.join(dfCN, on = 'E')
+    dic = {}
+    for k, v in events_metadata.items():
+        data = v.split('_')
+        E = int(data[0].replace('E', ''))
+        dic[E] = {'EventID': k, 'Decile': int(data[3].replace('D', ''))}
+    dic_df = pd.DataFrame.from_dict(dic).T
+    dic_df.index.name = 'E'
+    metadata = dfcomb.join(dic_df, on = 'E').to_dict()
+    return metadata
 
 
 def combine_excess_rainfall(outputs_dir: str, AOI: str, durations: list, 
