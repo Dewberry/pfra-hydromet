@@ -962,8 +962,8 @@ def dic_key_to_str(orig_dic: dict) -> dict:
     return dic_str
 
 
-def extract_event_metadata(outfiles: list, outputs_dir: str, 
-                                remove_intermediates: bool = True) -> dict:
+def extract_event_metadata(outfiles: list, events_metadata: dict,  
+                outputs_dir: str, remove_intermediates: bool = True) -> dict:
     '''Loads all of the intermediate metadata files created during the 
        randomization steps and saves them to a single dictionary.
     '''
@@ -1001,30 +1001,42 @@ def extract_event_metadata(outfiles: list, outputs_dir: str,
     return metadata
 
 
-def combine_excess_rainfall(outputs_dir: str, AOI: str, durations: list, 
-                                tempEpsilon_dic: dict, convEpsilon_dic: dict, 
-                                                volEpsilon_dic: dict) -> dict:
+def combine_excess_rainfall(var: str, outputs_dir: str, AOI: str, 
+            durations: list, tempEpsilon_dic: dict, convEpsilon_dic: dict, 
+                volEpsilon_dic: dict, remove_ind_dur: bool = True) -> dict:
     '''Combines the excess rainfall *.csv files for each duration into a 
        single dictionary for all durations.
     '''
     dic = {}
+    df_lst = []
     for dur in durations:
-        events = {}
         tE = tempEpsilon_dic[str(dur)]
         cE = convEpsilon_dic[str(dur)]
         vE = volEpsilon_dic[str(dur)]
         scen='{0}_Dur{1}_tempE{2}_convE{3}_volE{4}'.format(AOI, dur, tE, cE, vE)
-        fn = 'Excess_Rainfall_{0}.csv'.format(scen)
-        df = pd.read_csv(outputs_dir/fn)
-        df_dic = df.to_dict()
-        dates = list(df_dic['hours'].values())
-        for k, v in df_dic.items():
-            if 'E' in k:
-                events[k] = list(v.values())
-        dic[str(dur)] = {'dates': dates, 'events': events}
+        file = outputs_dir/'{}_{}.csv'.format(var, scen)
+        df = pd.read_csv(file)
+        if remove_ind_dur:
+            os.remove(file)
+        if var == 'Excess_Rainfall':
+            df_dic = df.to_dict()
+            dates = list(df_dic['hours'].values())
+            events = {}
+            for k, v in df_dic.items():
+                if 'E' in k:
+                    events[k] = list(v.values())
+            dic[str(dur)] = {'dates': dates, 'events': events}
+        elif var == 'Weights':
+            df_lst.append(df)
+    if var == 'Weights':
+        all_dfs = pd.concat(df_lst)
+        all_dfs = all_dfs.set_index('Unnamed: 0')
+        all_dfs.index.name = ''
+        print('Total Weight:', all_dfs['Weight'].sum())
+        dic = all_dfs.to_dict()
     return dic
 
-
+    
 #---------------------------------------------------------------------------#
 # Plotting Functions
 #---------------------------------------------------------------------------#
