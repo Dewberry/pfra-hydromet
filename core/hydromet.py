@@ -144,9 +144,11 @@ def get_quartile_rank(data_dir: str, filename: str, vol: int, reg: int,
     sheet = 'NOAA Atlas 14 Vol {0}'.format(vol)
     df = pd.read_excel(input_data, sheet_name=sheet, index_col=0)
     rank=list(df[(df.index==dur)  & (df['Region']==reg)].values[0])[1:5]
-    rank_per=[]
+    rank_per = []
     for i in rank: 
         rank_per.append(i/100.0)
+    total = sum(rank_per)
+    assert 0.99 <= total <= 1.01, 'Sum of ranks not between 99% and 101%' 
     if display_print: print(rank_per)
     return rank_per
 
@@ -451,9 +453,9 @@ def prep_cn_table(CN: int, arc_data: dict) -> pd.DataFrame:
 
 
 def populate_event_precip_data(random_cns: pd.DataFrame, 
-	temporals: pd.DataFrame, random_precip_table: pd.DataFrame,
-	data_table: pd.DataFrame, curve_group: dict, dur: int=24,
-	adjust_CN_less24: bool = False) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame):
+    temporals: pd.DataFrame, random_precip_table: pd.DataFrame,
+    data_table: pd.DataFrame, curve_group: dict, dur: int=24,
+    adjust_CN_less24: bool = False) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame):
     '''Calculates cumulative and incremental runoff for each event using a 
        randomly selected precipitation amount, quartile specific temporal 
        distribution, and curve number. 
