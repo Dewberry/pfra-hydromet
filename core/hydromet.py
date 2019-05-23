@@ -5,10 +5,12 @@ import json
 import time
 import urllib
 import shutil
+import logging
 import operator
 import warnings
 warnings.filterwarnings('ignore')
 import pathlib as pl
+import papermill as pm
 import scrapbook as sb
 from zipfile import ZipFile
 from datetime import datetime
@@ -30,7 +32,6 @@ import geopandas as gpd
 from rasterio.mask import mask
 from shapely.geometry import mapping
 
-#from hydromet_plotter import*
 geoDF = 'GeoDataFrame'
 
 
@@ -1085,7 +1086,9 @@ def plot_rainfall_and_excess(final_precip: pd.DataFrame,
     return fig
 
 
-def plot_curve_groups(reordered_group: dict, reordered_curves: pd.DataFrame, curve_test_df: pd.DataFrame, y_max: float, final: bool=True) -> plt.subplots:
+def plot_curve_groups(reordered_group: dict, reordered_curves: pd.DataFrame,
+                                    curve_test_df: pd.DataFrame, y_max: float, 
+                                            final: bool=True) -> plt.subplots:
     '''Plots the mean temporal distribution and the corresponding 
        individual temporal distributions of a curve group for each group as 
        separate plots.  
