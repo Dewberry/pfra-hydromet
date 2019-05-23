@@ -311,7 +311,9 @@ def find_optimal_curve_std(df: pd.DataFrame, lower: str=r'Lower (90%)',
     return df
 
 
-def RandomizeData(df: pd.DataFrame, number: int, outputs_dir: str, AOI: str, dur: int, tempE: int, convE: float, volE: float, quartile: int=None, seed: int=None, sampling_distro: str='Lognorm', 
+def RandomizeData(df: pd.DataFrame, number: int, outputs_dir: str, AOI: str, 
+        dur: int, tempE: int, convE: float, volE: float, quartile: int=None, 
+                            seed: int=None, sampling_distro: str='Lognorm', 
                     variable: str='Precipitation', lower: str=r'Lower (90%)', 
                                 upper: str=r'Upper (90%)', plot: bool=False, 
                                     display_print: bool=True) -> pd.DataFrame:
@@ -342,14 +344,13 @@ def RandomizeData(df: pd.DataFrame, number: int, outputs_dir: str, AOI: str, dur
     if variable=='CN': df[current_col]=df[current_col].apply(lambda x: int(x))
     rand_data = [col for col in df.columns.tolist() if 'Random' in col]
     if os.path.isdir(outputs_dir)==False:
-        fn =
         os.mkdir(outputs_dir)
     if variable == 'Precipitation': 
-        fn = "Precip_Q{0}_{1}_Dur{2}_tempE{3}_convE{4}_volE{5}_Se{6}.csv".format(quartile, AOI, dur, tempE, _convE, volE, seed)
+        fn = "Precip_Q{0}_{1}_Dur{2}_tempE{3}_convE{4}_volE{5}_Se{6}.csv".format(quartile, AOI, dur, tempE, convE, volE, seed)
         if display_print: 
             print('Seed - Precipitation:', seed)
     elif variable == 'CN':
-        fn = "CN_{0}_Dur{1}_tempE{2}_convE{3}_volE{4}_Se{5}.csv".format(AOI, dur, tempE, _convE, volE, seed)
+        fn = "CN_{0}_Dur{1}_tempE{2}_convE{3}_volE{4}_Se{5}.csv".format(AOI, dur, tempE, convE, volE, seed)
         if display_print: 
             print('Seed - CN:', seed)
             print(display(df[rand_data].head(2)))
@@ -439,9 +440,9 @@ def prep_cn_table(CN: int, arc_data: dict) -> pd.DataFrame:
 
 
 def populate_event_precip_data(random_cns: pd.DataFrame, 
-	temporals: pd.DataFrame, random_precip_table: pd.DataFrame,
-	data_table: pd.DataFrame, curve_group: dict, dur: int=24,
-	adjust_CN_less24: bool = False) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame):
+    temporals: pd.DataFrame, random_precip_table: pd.DataFrame,
+    data_table: pd.DataFrame, curve_group: dict, dur: int=24,
+    adjust_CN_less24: bool = False) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame):
     '''Calculates cumulative and incremental runoff for each event using a 
        randomly selected precipitation amount, quartile specific temporal 
        distribution, and curve number. 
@@ -960,6 +961,30 @@ def dic_key_to_str(orig_dic: dict) -> dict:
     for k in orig_dic.keys():
         dic_str[str(k)]=orig_dic[k]
     return dic_str
+
+
+def combine_excess_rainfall(outputs_dir: str, AOI: str, durations: list, 
+                                tempEpsilon_dic: dict, convEpsilon_dic: dict, 
+                                                volEpsilon_dic: dict) -> dict:
+    '''Combines the excess rainfall *.csv files for each duration into a 
+       single dictionary for all durations.
+    '''
+    dic = {}
+    for dur in durations:
+        events = {}
+        tE = tempEpsilon_dic[str(dur)]
+        cE = convEpsilon_dic[str(dur)]
+        vE = volEpsilon_dic[str(dur)]
+        scen='{0}_Dur{1}_tempE{2}_convE{3}_volE{4}'.format(AOI, dur, tE, cE, vE)
+        fn = 'Excess_Rainfall_{0}.csv'.format(scen)
+        df = pd.read_csv(outputs_dir/fn)
+        df_dic = df.to_dict()
+        dates = list(df_dic['hours'].values())
+        for k, v in df_dic.items():
+            if 'E' in k:
+                events[k] = list(v.values())
+        dic[str(dur)] = {'dates': dates, 'events': events}
+    return dic
 
 
 #---------------------------------------------------------------------------#
