@@ -311,11 +311,10 @@ def find_optimal_curve_std(df: pd.DataFrame, lower: str=r'Lower (90%)',
     return df
 
 
-def RandomizeData(df: pd.DataFrame, number: int, results_dir: str, 
-            AOI: str, duration: int=24, quartile: int=None, seed: int=None, 
-            sampling_distro: str='Lognorm', variable: str='Precipitation', 
-                        lower: str=r'Lower (90%)', upper: str=r'Upper (90%)', 
-                plot: bool=False, display_print: bool=True) -> pd.DataFrame:
+def RandomizeData(df: pd.DataFrame, number: int, outputs_dir: str, AOI: str, dur: int, tempE: int, convE: float, volE: float, quartile: int=None, seed: int=None, sampling_distro: str='Lognorm', 
+                    variable: str='Precipitation', lower: str=r'Lower (90%)', 
+                                upper: str=r'Upper (90%)', plot: bool=False, 
+                                    display_print: bool=True) -> pd.DataFrame:
     '''Randomly selects a value (precipitation or curve number) from the log-
        normal distribution given the expected value and optimized standard 
        devation for each recurrance interval/event.
@@ -342,20 +341,21 @@ def RandomizeData(df: pd.DataFrame, number: int, results_dir: str,
     df.loc[idx, current_col] = df.loc[idx, upper]
     if variable=='CN': df[current_col]=df[current_col].apply(lambda x: int(x))
     rand_data = [col for col in df.columns.tolist() if 'Random' in col]
-    if os.path.isdir(results_dir)==False:
-        os.mkdir(results_dir)
-    if quartile==None:
-        df.to_csv(results_dir/"Randomized_{0}_Seed"
-                        "_{1}_{2}.csv".format(variable, seed, AOI))
-    else:
-        df.to_csv(results_dir/"Randomized_{0}_Quartile_{1}_"
-            "Seed_{2}_{3}.csv".format(variable, quartile, seed, AOI))
-    if plot: plot_rand_precip_data(df, rand_data, duration)
-    if variable=='Precipitation' and display_print: 
-        print('Seed - Precipitation:', seed)
-    if variable=='CN' and display_print: 
-        print('Seed - CN:', seed)
-        print(display(df[rand_data].head(2)))
+    if os.path.isdir(outputs_dir)==False:
+        fn =
+        os.mkdir(outputs_dir)
+    if variable == 'Precipitation': 
+        fn = "Precip_Q{0}_{1}_Dur{2}_tempE{3}_convE{4}_volE{5}_Se{6}.csv".format(quartile, AOI, dur, tempE, _convE, volE, seed)
+        if display_print: 
+            print('Seed - Precipitation:', seed)
+    elif variable == 'CN':
+        fn = "CN_{0}_Dur{1}_tempE{2}_convE{3}_volE{4}_Se{5}.csv".format(AOI, dur, tempE, _convE, volE, seed)
+        if display_print: 
+            print('Seed - CN:', seed)
+            print(display(df[rand_data].head(2)))
+    df.to_csv(outputs_dir/'Rand_{}'.format(fn)) 
+
+    if plot: plot_rand_precip_data(df, rand_data, dur)
     return df[rand_data]
 
 
