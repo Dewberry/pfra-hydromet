@@ -50,6 +50,19 @@ geoDF = 'GeoDataFrame'
 #---------------------------------------------------------------------------#
 
 
+def get_volume_code(datarepository_dir: str, vol_code_filename: str, 
+                                        vol: int, sub_vol: int = None) -> str:
+    ''' Extracts the NOAA Atlas 14 volume code for the specified volume number.
+    '''
+    if vol==5: assert sub_vol!=None, 'For Volume 5, specify sub-volume number'
+    with open(datarepository_dir/vol_code_filename) as json_file:  
+        vol_code = json.load(json_file)
+    code = vol_code[str(vol)]
+    if vol == 5: code = code[str(sub_vol)]
+    print('NOAA Atlas 14 Volume Code:', code)
+    return code
+
+
 def parse_filename(zip_name: str, reg: str) -> dict:
     '''Builds a dictionary with the region, recurrance interval, duration, 
        and statistic type using the zip_name and region.
@@ -132,9 +145,11 @@ def get_quartile_rank(data_dir: str, filename: str, vol: int, reg: int,
     sheet = 'NOAA Atlas 14 Vol {0}'.format(vol)
     df = pd.read_excel(input_data, sheet_name=sheet, index_col=0)
     rank=list(df[(df.index==dur)  & (df['Region']==reg)].values[0])[1:5]
-    rank_per=[]
+    rank_per = []
     for i in rank: 
         rank_per.append(i/100.0)
+    total = sum(rank_per)
+    assert 0.99 <= total <= 1.01, 'Sum of ranks not between 99% and 101%' 
     if display_print: print(rank_per)
     return rank_per
 
