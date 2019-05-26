@@ -2,12 +2,15 @@ import os
 import io
 import re
 import json
+import time
 import urllib
+import shutil
+import logging
 import operator
 import warnings
 warnings.filterwarnings('ignore')
 import pathlib as pl
-from time import time
+import papermill as pm
 import scrapbook as sb
 from zipfile import ZipFile
 from datetime import datetime
@@ -29,7 +32,6 @@ import geopandas as gpd
 from rasterio.mask import mask
 from shapely.geometry import mapping
 
-#from hydromet_plotter import*
 geoDF = 'GeoDataFrame'
 
 
@@ -120,7 +122,6 @@ def get_temporals(temporal_dir: str, vol: int, reg: int, dur: int,
        are dropped. Data was downloaded from:
        https://hdsc.nws.noaa.gov/hdsc/pfds/pfds_temporal.html
     '''
-    #assert vol in [2, 9], "Temporal data not QCed, check data structure"
     f = 'Temporals_Volume{0}_Region{1}_Duration{2}.csv'.format(vol, reg, dur)
     path = temporal_dir/f
     s = qmap['skiprows']
@@ -325,11 +326,11 @@ def find_optimal_curve_std(df: pd.DataFrame, lower: str=r'Lower (90%)',
     return df
 
 
-def RandomizeData(df: pd.DataFrame, number: int, results_dir: str, 
-            AOI: str, duration: int=24, quartile: int=None, seed: int=None, 
-            sampling_distro: str='Lognorm', variable: str='Precipitation', 
-                        lower: str=r'Lower (90%)', upper: str=r'Upper (90%)', 
-                plot: bool=False, display_print: bool=True) -> pd.DataFrame:
+def RandomizeData(df: pd.DataFrame, number: int, outputs_dir: str, 
+    filename: str, dur: int, seed: int=None, sampling_distro: str='Lognorm',
+                    variable: str='Precipitation', lower: str=r'Lower (90%)', 
+                                upper: str=r'Upper (90%)', plot: bool=False, 
+                                display_print: bool=True) -> pd.DataFrame:
     '''Randomly selects a value (precipitation or curve number) from the log-
        normal distribution given the expected value and optimized standard 
        devation for each recurrance interval/event.
@@ -356,20 +357,20 @@ def RandomizeData(df: pd.DataFrame, number: int, results_dir: str,
     df.loc[idx, current_col] = df.loc[idx, upper]
     if variable=='CN': df[current_col]=df[current_col].apply(lambda x: int(x))
     rand_data = [col for col in df.columns.tolist() if 'Random' in col]
-    if os.path.isdir(results_dir)==False:
-        os.mkdir(results_dir)
-    if quartile==None:
-        df.to_csv(results_dir/"Randomized_{0}_Seed"
-                        "_{1}_{2}.csv".format(variable, seed, AOI))
-    else:
-        df.to_csv(results_dir/"Randomized_{0}_Quartile_{1}_"
-            "Seed_{2}_{3}.csv".format(variable, quartile, seed, AOI))
-    if plot: plot_rand_precip_data(df, rand_data, duration)
-    if variable=='Precipitation' and display_print: 
-        print('Seed - Precipitation:', seed)
-    if variable=='CN' and display_print: 
-        print('Seed - CN:', seed)
-        print(display(df[rand_data].head(2)))
+    if os.path.isdir(outputs_dir)==False:
+        os.mkdir(outputs_dir)
+    if variable=='Precipitation': 
+        df_rename = df.copy()
+        df_rename.index.name ='Tr'
+    elif variable == 'CN':
+        df_rename = df.copy()
+        df_rename.index.name ='E'
+        if display_print: 
+            print(display(df[rand_data].head(2)))    
+    df_rename.to_csv(outputs_dir/filename) 
+    if display_print: 
+            print('{0} - Seed:'.format(variable), seed) 
+    if plot: plot_rand_precip_data(df, rand_data, dur)
     return df[rand_data]
 
 
@@ -461,7 +462,7 @@ def populate_event_precip_data(random_cns: pd.DataFrame,
        distribution, and curve number. 
     '''
     precip_data = random_precip_table.copy()
-    events_log = pd.DataFrame()
+    events_log = {}
     runids = []
     simID = int(str(dur)+'0000')
     output_precip_data = pd.DataFrame(index = curve_group['q1'].index) 
@@ -895,6 +896,78 @@ def Rename_Final_Groups(curve_weight: dict, dur: int) -> dict:
     return rename_map    
 
 
+def determine_tstep_units(incr_excess: pd.DataFrame) -> dict:
+    '''Determines the timestep and the timestep's units of the incremental
+       excess runoff.
+    '''
+    assert incr_excess.index.name == 'hours', 'Timestep and timesteps units' 
+    'cannot be calculated if the runoff duration is not in units of hours'
+    tstep = incr_excess.index[-1]/(incr_excess.shape[0]-1)
+    dic = {}
+    if tstep < 1.0:        
+        dic[int(60.0*tstep)] = 'MIN' 
+    elif tstep >= 1.0:
+        dic[int(tstep)] = 'HOUR'
+    else:
+        print('Timestep and timestep units were not determined')
+    return dic
+
+
+def dss_map(outputs_dir: str, var: str, tstep: int, tstep_units: str,
+                units: str, dtype: str='INST-VAL', IMP: str='DSS_MAP.input', 
+                                        to_dss: str='ToDSS.input') -> None:
+    '''Creates a map file containing the data structure for DSSUTL.EXE.
+    '''
+    var8 = var[:8]
+    ts = '{0}{1}'.format(tstep, tstep_units)
+    output_file = outputs_dir/IMP
+    datastring = "EV {0}=///{0}//{1}// UNITS={2} TYPE={3}\nEF [APART] [BPART] [DATE] [TIME] [{0}]\nIMP {4}".format(var8, ts, units, dtype, to_dss)
+    with open(output_file, 'w') as f: 
+        f.write(datastring)
+    return None
+
+
+def excess_df_to_input(outputs_dir: str, df: pd.DataFrame, tstep: float,
+        tstep_units: str, scen_name: str, to_dss: str='ToDSS.input') -> None:
+    '''Writes the excess rainfall dataframe to an input file according to the 
+       struture specified within DSS_MAP.input.
+    '''
+    temp_data_file = outputs_dir/to_dss
+    cols = df.columns.tolist()
+    start_date = datetime.combine(datetime.now().date(), datetime.min.time())
+    with open(temp_data_file, 'w') as f:
+        for i, col in enumerate(cols):
+            m_dtm = start_date
+            event_data = df[col]
+            for j, idx in enumerate(event_data.index):
+                if j > 0: m_dtm+=pd.Timedelta(hours = tstep)
+                htime_string = datetime.strftime(m_dtm, '%d%b%Y %H%M')
+                runoff = event_data.loc[idx]
+                f.write('"{}"'.format(scen_name)+' '+col+' '+htime_string+' '+str(runoff)+'\n')
+    return None
+
+
+def make_dss_file(outputs_dir: str, bin_dir: str, dssutil: str, 
+                        dss_filename: str, IMP: str='DSS_MAP.input',
+                to_dss: str='ToDSS.input', remove_temp_files: bool=True, 
+                                        display_print: bool = True) -> None:
+    '''Runs the DSSUTL executable using the DSS_MAP.input file to map the 
+       excess rainfall data from the ToDSS.input file and saves the results
+       to a dss file.
+    '''
+    shutil.copy(bin_dir/dssutil, outputs_dir)
+    os.chdir(outputs_dir)
+    os.system("{0} {1}.dss INPUT={2}".format(dssutil, dss_filename, IMP))
+    time.sleep(5)
+    if remove_temp_files:
+        os.remove(outputs_dir/IMP)
+        os.remove(outputs_dir/dssutil)
+        os.remove(outputs_dir/to_dss)
+    filepath = outputs_dir/dss_filename
+    if display_print: print('Dss File written to {0}.dss'.format(filepath))
+    return None
+
+
 def dic_key_to_str(orig_dic: dict) -> dict:
     '''Converts the keys of the passed dictionary to strings.
     '''
@@ -904,6 +977,81 @@ def dic_key_to_str(orig_dic: dict) -> dict:
     return dic_str
 
 
+def extract_event_metadata(outfiles: list, events_metadata: dict,  
+                outputs_dir: str, remove_intermediates: bool = True) -> dict:
+    '''Loads all of the intermediate metadata files created during the 
+       randomization steps and saves them to a single dictionary.
+    '''
+    for f in outfiles:
+        file = outputs_dir/f
+        df = pd.read_csv(file)
+        if remove_intermediates:
+            os.remove(file)
+        if 'Rand_Precip' in f:
+            if 'Q1' in f: dfQ1 = df.copy()
+            if 'Q2' in f: dfQ2 = df.copy()
+            if 'Q3' in f: dfQ3 = df.copy()
+            if 'Q4' in f: dfQ4 = df.copy()
+        elif 'Rand_CN' in f:
+            dfCN = df.set_index('E').copy()
+    dfQ = pd.concat([dfQ1, dfQ2, dfQ3, dfQ4])
+    dfQ['E'] = np.arange(1, len(dfQ)+1)
+    dfQ = dfQ.set_index('E')
+    new_col = []
+    for col in list(dfCN.columns):
+        if 'CN' not in col:
+            new_col.append(col+' CN')
+        else:
+            new_col.append(col)   
+    dfCN.columns = new_col
+    dfcomb = dfQ.join(dfCN, on = 'E')
+    dic = {}
+    for k, v in events_metadata.items():
+        data = v.split('_')
+        E = int(data[0].replace('E', ''))
+        dic[E] = {'EventID': k, 'Decile': int(data[3].replace('D', ''))}
+    dic_df = pd.DataFrame.from_dict(dic).T
+    dic_df.index.name = 'E'
+    metadata = dfcomb.join(dic_df, on = 'E').to_dict()
+    return metadata
+
+
+def combine_excess_rainfall(var: str, outputs_dir: str, AOI: str, 
+            durations: list, tempEpsilon_dic: dict, convEpsilon_dic: dict, 
+                volEpsilon_dic: dict, remove_ind_dur: bool = True) -> dict:
+    '''Combines the excess rainfall *.csv files for each duration into a 
+       single dictionary for all durations.
+    '''
+    dic = {}
+    df_lst = []
+    for dur in durations:
+        tE = tempEpsilon_dic[str(dur)]
+        cE = convEpsilon_dic[str(dur)]
+        vE = volEpsilon_dic[str(dur)]
+        scen='{0}_Dur{1}_tempE{2}_convE{3}_volE{4}'.format(AOI, dur, tE, cE, vE)
+        file = outputs_dir/'{}_{}.csv'.format(var, scen)
+        df = pd.read_csv(file)
+        if remove_ind_dur:
+            os.remove(file)
+        if var == 'Excess_Rainfall':
+            df_dic = df.to_dict()
+            dates = list(df_dic['hours'].values())
+            events = {}
+            for k, v in df_dic.items():
+                if 'E' in k:
+                    events[k] = list(v.values())
+            dic[str(dur)] = {'dates': dates, 'events': events}
+        elif var == 'Weights':
+            df_lst.append(df)
+    if var == 'Weights':
+        all_dfs = pd.concat(df_lst)
+        all_dfs = all_dfs.set_index('Unnamed: 0')
+        all_dfs.index.name = ''
+        print('Total Weight:', all_dfs['Weight'].sum())
+        dic = all_dfs.to_dict()
+    return dic
+
+    
 #---------------------------------------------------------------------------#
 # Plotting Functions
 #---------------------------------------------------------------------------#
@@ -1028,7 +1176,9 @@ def plot_rainfall_and_excess(final_precip: pd.DataFrame,
     return fig
 
 
-def plot_curve_groups(reordered_group: dict, reordered_curves: pd.DataFrame, curve_test_df: pd.DataFrame, y_max: float, final: bool=True) -> plt.subplots:
+def plot_curve_groups(reordered_group: dict, reordered_curves: pd.DataFrame,
+                                    curve_test_df: pd.DataFrame, y_max: float, 
+                                            final: bool=True) -> plt.subplots:
     '''Plots the mean temporal distribution and the corresponding 
        individual temporal distributions of a curve group for each group as 
        separate plots.  

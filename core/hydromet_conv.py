@@ -1,6 +1,3 @@
-from time import time
-import numpy as np
-import pandas as pd
 from hydromet import*
 
 
@@ -21,7 +18,7 @@ def main(binData: list, incr_excess: pd.DataFrame, tempE: float,
     group_start_num = 0
     adj_tempE = convert_tempEpsilon(tempE, incr_excess)
     for i, b in enumerate(binData): 
-        start = time()
+        start = time.time()
         if b[1] == binData[0][1]:   
             binstart, binstop = 0, binData[1][1]
         elif b[1] == binData[-1][1]: 
@@ -80,7 +77,7 @@ def main(binData: list, incr_excess: pd.DataFrame, tempE: float,
             penult_tests[group_start_num] = [1.0]
             group_start_num += 1
         if display_print: print('Processed Bin {} with {} curves in {} Minutes'
-            ''.format(i, dataslice.shape[1], round(time()-start)/60, 3))
+            ''.format(i, dataslice.shape[1], round(time.time()-start)/60, 3))
     results = {'penult_curves': penult_curves,
                'penult_groups': penult_groups, 
                'penult_tests': penult_tests,
