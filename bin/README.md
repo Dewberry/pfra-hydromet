@@ -1,6 +1,3 @@
-# bin
-
-
 ## Description
 
 This folder contains the binary files called by the pfra-hydromet tools.
