@@ -1018,7 +1018,7 @@ def extract_event_metadata(outfiles: list, events_metadata: dict,
 
 def combine_excess_rainfall(var: str, outputs_dir: str, AOI: str, 
             durations: list, tempEpsilon_dic: dict, convEpsilon_dic: dict, 
-                volEpsilon_dic: dict, remove_ind_dur: bool = True) -> dict:
+    volEpsilon_dic: dict, BCN: str=None, remove_ind_dur: bool = True) -> dict:
     '''Combines the excess rainfall *.csv files for each duration into a 
        single dictionary for all durations.
     '''
@@ -1034,13 +1034,14 @@ def combine_excess_rainfall(var: str, outputs_dir: str, AOI: str,
         if remove_ind_dur:
             os.remove(file)
         if var == 'Excess_Rainfall':
+            dic[str(dur)] = {'BCName': BCN}
             df_dic = df.to_dict()
             dates = list(df_dic['hours'].values())
             events = {}
             for k, v in df_dic.items():
                 if 'E' in k:
                     events[k] = list(v.values())
-            dic[str(dur)] = {'dates': dates, 'events': events}
+            dic[str(dur)][BCN] = {'dates': dates, 'events': events}
         elif var == 'Weights':
             df_lst.append(df)
     if var == 'Weights':
@@ -1050,7 +1051,7 @@ def combine_excess_rainfall(var: str, outputs_dir: str, AOI: str,
         print('Total Weight:', all_dfs['Weight'].sum())
         dic = all_dfs.to_dict()
     return dic
-
+    
     
 #---------------------------------------------------------------------------#
 # Plotting Functions
