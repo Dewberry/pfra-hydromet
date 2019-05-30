@@ -8,13 +8,14 @@ import shutil
 import logging
 import operator
 import warnings
-warnings.filterwarnings('ignore')
 import pathlib as pl
 import papermill as pm
 import scrapbook as sb
 from zipfile import ZipFile
 from datetime import datetime
 from collections import Counter
+warnings.filterwarnings('ignore')
+logging.basicConfig(level=logging.ERROR)
 
 import numpy as np
 import pandas as pd
@@ -1018,7 +1019,7 @@ def extract_event_metadata(outfiles: list, events_metadata: dict,
 
 def combine_excess_rainfall(var: str, outputs_dir: str, AOI: str, 
             durations: list, tempEpsilon_dic: dict, convEpsilon_dic: dict, 
-                volEpsilon_dic: dict, remove_ind_dur: bool = True) -> dict:
+    volEpsilon_dic: dict, BCN: str=None, remove_ind_dur: bool = True) -> dict:
     '''Combines the excess rainfall *.csv files for each duration into a 
        single dictionary for all durations.
     '''
@@ -1040,7 +1041,8 @@ def combine_excess_rainfall(var: str, outputs_dir: str, AOI: str,
             for k, v in df_dic.items():
                 if 'E' in k:
                     events[k] = list(v.values())
-            dic[str(dur)] = {'dates': dates, 'events': events}
+            key ='H{0}'.format(str(dur).zfill(2))         
+            dic[key] = {'dates': dates, 'BCName': {BCN: events}}
         elif var == 'Weights':
             df_lst.append(df)
     if var == 'Weights':
@@ -1050,7 +1052,7 @@ def combine_excess_rainfall(var: str, outputs_dir: str, AOI: str,
         print('Total Weight:', all_dfs['Weight'].sum())
         dic = all_dfs.to_dict()
     return dic
-
+    
     
 #---------------------------------------------------------------------------#
 # Plotting Functions
