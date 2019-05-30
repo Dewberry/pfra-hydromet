@@ -8,13 +8,14 @@ import shutil
 import logging
 import operator
 import warnings
-warnings.filterwarnings('ignore')
 import pathlib as pl
 import papermill as pm
 import scrapbook as sb
 from zipfile import ZipFile
 from datetime import datetime
 from collections import Counter
+warnings.filterwarnings('ignore')
+logging.basicConfig(level=logging.ERROR)
 
 import numpy as np
 import pandas as pd
@@ -1034,14 +1035,14 @@ def combine_excess_rainfall(var: str, outputs_dir: str, AOI: str,
         if remove_ind_dur:
             os.remove(file)
         if var == 'Excess_Rainfall':
-            dic[str(dur)] = {'BCName': BCN}
             df_dic = df.to_dict()
             dates = list(df_dic['hours'].values())
             events = {}
             for k, v in df_dic.items():
                 if 'E' in k:
                     events[k] = list(v.values())
-            dic[str(dur)][BCN] = {'dates': dates, 'events': events}
+            key ='H{0}'.format(str(dur).zfill(2))         
+            dic[key] = {'dates': dates, 'BCName': {BCN: events}}
         elif var == 'Weights':
             df_lst.append(df)
     if var == 'Weights':
