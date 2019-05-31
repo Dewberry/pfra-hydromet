@@ -1031,18 +1031,20 @@ def combine_excess_rainfall(var: str, outputs_dir: str, AOI: str,
         vE = volEpsilon_dic[str(dur)]
         scen='{0}_Dur{1}_tempE{2}_convE{3}_volE{4}'.format(AOI, dur, tE, cE, vE)
         file = outputs_dir/'{}_{}.csv'.format(var, scen)
-        df = pd.read_csv(file)
+        df = pd.read_csv(file, index_col = 0)
         if remove_ind_dur:
             os.remove(file)
         if var == 'Excess_Rainfall':
             df_dic = df.to_dict()
-            dates = list(df_dic['hours'].values())
+            dates = list(df.index)
+            ordin = df.index.name.title()
             events = {}
             for k, v in df_dic.items():
                 if 'E' in k:
                     events[k] = list(v.values())
-            key ='H{0}'.format(str(dur).zfill(2))         
-            dic[key] = {'dates': dates, 'BCName': {BCN: events}}
+            key ='H{0}'.format(str(dur).zfill(2))
+            val = {'time_idx_ordinate': ordin, 'time_idx': dates, 'BCName': {BCN: events}}         
+            dic[key] = val
         elif var == 'Weights':
             df_lst.append(df)
     if var == 'Weights':
@@ -1052,6 +1054,7 @@ def combine_excess_rainfall(var: str, outputs_dir: str, AOI: str,
         print('Total Weight:', all_dfs['Weight'].sum())
         dic = all_dfs.to_dict()
     return dic
+    
     
     
 #---------------------------------------------------------------------------#
