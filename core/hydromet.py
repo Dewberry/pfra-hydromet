@@ -1043,8 +1043,6 @@ def combine_results(var: str, outputs_dir: str, AOI: str,
         scen='{0}_Dur{1}_tempE{2}_convE{3}_volE{4}'.format(AOI, dur, tE, cE, vE)
         file = outputs_dir/'{}_{}.csv'.format(var, scen)
         df = pd.read_csv(file, index_col = 0)
-        if remove_ind_dur:
-            os.remove(file)
         if var == 'Excess_Rainfall':
             df_dic = df.to_dict()
             dates = list(df.index)
@@ -1058,6 +1056,8 @@ def combine_results(var: str, outputs_dir: str, AOI: str,
             dic[key] = val
         elif var == 'Weights':
             df_lst.append(df)
+        if remove_ind_dur:
+            os.remove(file)    
     if var == 'Weights':
         all_dfs = pd.concat(df_lst)
         all_dfs = all_dfs.set_index('Unnamed: 0')
@@ -1066,8 +1066,30 @@ def combine_results(var: str, outputs_dir: str, AOI: str,
         dic = all_dfs.to_dict()
     return dic
     
+
+ def combine_metadata(outputs_dir: str, AOI: str, durations: list, 
+        tempEpsilon_dic: dict, convEpsilon_dic: dict, volEpsilon_dic: dict, 
+                            BCN: str, remove_ind_dur: bool = True) -> dict:
+    '''Combines the metadata files for each duration into a single file for
+       all durations.
+    '''
+    dic = {}
+    for dur in durations:
+        tE = tempEpsilon_dic[str(dur)]
+        cE = convEpsilon_dic[str(dur)]
+        vE = volEpsilon_dic[str(dur)]
+        scen='{0}_Dur{1}_tempE{2}_convE{3}_volE{4}'.format(AOI, dur, tE, cE, vE)
+        file = outputs_dir/'{}_{}.json'.format(var, scen)  
+        with open(file) as f:
+            md =  json.load(f)
+        key = 'H{0}'.format(str(dur).zfill(2))
+        val = {'BCName': {BCN: md}}
+        dic[key] = val
+        if remove_ind_dur:
+            os.remove(file)
+    return dic   
     
-    
+
 #---------------------------------------------------------------------------#
 # Plotting Functions
 #---------------------------------------------------------------------------#
@@ -1243,20 +1265,20 @@ def plot_amount_vs_weight(weights: pd.DataFrame,
     '''
     n = len(weights)
     weights['Runoff'] = np.zeros(n)
-    weights['Dur'] = np.zeros(n
+    weights['Dur'] = np.zeros(n)
+    fig, ax = plt.subplots(1,1, figsize=(24,5))
     for dur in excess_dic.keys():
+        fdur = float(dur.replace('H',''))
         for k, v in excess_dic[dur]['BCName'][BCN].items():
             weights.loc[k]['Runoff'] = sum(v)
-            weights.loc[k]['Dur'] = float(dur.replace('H',''))
-    fig, ax = plt.subplots(1,1, figsize=(24,5))
-    ax.plot(weights[weights['Dur']==6]['Weight'], weights[weights['Dur']==6]['Runoff'], marker='.', label='H06', color='green')
-    ax.plot(weights[weights['Dur']==12]['Weight'], weights[weights['Dur']==12]['Runoff'], marker='.', label='H12', color='blue')
-    ax.plot(weights[weights['Dur']==24]['Weight'], weights[weights['Dur']==24]['Runoff'], marker='.', label='H24', color='black')
-    ax.plot(weights[weights['Dur']==96]['Weight'], weights[weights['Dur']==96]['Runoff'], marker='.', label='H96', color='purple')
+            weights.loc[k]['Dur'] = fdur
+        x = weights[weights['Dur']==fdur]['Weight']    
+        y = weights[weights['Dur']==fdur]['Runoff']
+        ax.plot(x, y, linestyle = '', marker = '.', label = dur)
     ax.set_xlabel('Event Weight, [-]')
     ax.set_ylabel('Excess Rainfall, [inches]')
     ax.set_title('Excess Rainfall Amount Versus Event Weight ({} Events)'.format(n))
-    ax.legend()        
+    ax.legend()             
 
 
 #---------------------------------------------------------------------------#
