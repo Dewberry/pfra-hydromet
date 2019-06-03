@@ -858,6 +858,16 @@ def dic_to_list(dic: dict, get_set: bool=False) -> list:
     return single_lst
 
 
+def adj_duration_weight(dur_weight: float, lower_limit: int, 
+                                        display_print: bool=True) -> float:
+    '''Adjust the duration weight by the lower recurrance interval since 
+       the events themseleves are truncated by this lower value.
+    '''
+    adj_dur_weight = dur_weight*1.0/lower_limit
+    if display_print: print(adj_dur_weight)
+    return adj_dur_weight
+
+
 def Calc_Group_Weight(final_groups: dict, duration_weight: float,
                                         display_print: bool = True) -> dict:
     '''Calculates the weight of each group of curves, such that the sum of 
