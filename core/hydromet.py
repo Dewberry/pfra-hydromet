@@ -1027,12 +1027,13 @@ def extract_event_metadata(outfiles: list, events_metadata: dict,
     return metadata
 
 
-def combine_excess_rainfall(var: str, outputs_dir: str, AOI: str, 
+def combine_results(var: str, outputs_dir: str, AOI: str, 
             durations: list, tempEpsilon_dic: dict, convEpsilon_dic: dict, 
     volEpsilon_dic: dict, BCN: str=None, remove_ind_dur: bool = True) -> dict:
     '''Combines the excess rainfall *.csv files for each duration into a 
        single dictionary for all durations.
     '''
+    assert var in ['Excess_Rainfall', 'Weights'], 'Cannot combine results'
     dic = {}
     df_lst = []
     for dur in durations:
@@ -1235,6 +1236,27 @@ def plot_grouped_curves(final_curves: dict, y_max: float,
     if iplot:
         plt.close(fig)
     return fig
+
+def plot_amount_vs_weight(weights: pd.DataFrame, 
+                                excess_dic: dict, BCN: str) -> plt.subplots:
+    '''Plot the total excess rainfall for each event versus its weight.
+    '''
+    n = len(weights)
+    weights['Runoff'] = np.zeros(n)
+    weights['Dur'] = np.zeros(n
+    for dur in excess_dic.keys():
+        for k, v in excess_dic[dur]['BCName'][BCN].items():
+            weights.loc[k]['Runoff'] = sum(v)
+            weights.loc[k]['Dur'] = float(dur.replace('H',''))
+    fig, ax = plt.subplots(1,1, figsize=(24,5))
+    ax.plot(weights[weights['Dur']==6]['Weight'], weights[weights['Dur']==6]['Runoff'], marker='.', label='H06', color='green')
+    ax.plot(weights[weights['Dur']==12]['Weight'], weights[weights['Dur']==12]['Runoff'], marker='.', label='H12', color='blue')
+    ax.plot(weights[weights['Dur']==24]['Weight'], weights[weights['Dur']==24]['Runoff'], marker='.', label='H24', color='black')
+    ax.plot(weights[weights['Dur']==96]['Weight'], weights[weights['Dur']==96]['Runoff'], marker='.', label='H96', color='purple')
+    ax.set_xlabel('Event Weight, [-]')
+    ax.set_ylabel('Excess Rainfall, [inches]')
+    ax.set_title('Excess Rainfall Amount Versus Event Weight ({} Events)'.format(n))
+    ax.legend()        
 
 
 #---------------------------------------------------------------------------#
