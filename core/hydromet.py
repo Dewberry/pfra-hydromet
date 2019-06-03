@@ -907,6 +907,42 @@ def Rename_Final_Groups(curve_weight: dict, dur: int) -> dict:
     return rename_map    
 
 
+def make_rainfall_adjustment(df: pd.DataFrame, col: pd.Series, minrate: float,
+            maxrate: float, min_cap: float=1.0, max_cap: float=1.0, seed: int=None) -> list:
+    '''Randomly selects a stormwater removal rate, calculates the design 
+       capacity, and uses the adjust_excess function to calculate the reduced
+       excess rainfall for the specified event within the passed dataframe.
+    '''
+    if not seed:
+        seed = np.random.randint(low=0, high=10000)
+    np.random.seed(seed)
+    ts = float(df.index[-1])/(df.shape[0]-1)
+    minrate30 = minrate*(ts*2.0)
+    maxrate30 = maxrate*(ts*2.0)
+    adj_rate = np.random.uniform(minrate30, maxrate30)   
+    max_cap = np.random.uniform(min_cap, max_cap)*(adj_rate*(24.0/ts))    
+    adj_excess = adjust_excess(df, col, adj_rate, max_cap)
+    results = [adj_rate, max_cap, adj_excess]
+    return results
+
+
+def adjust_excess(df: pd.DataFrame, col: str, adj_rate: float, 
+                                        max_capacity: float) -> pd.DataFrame:
+    '''Given the stormwater removal rate and the design capacity, the 
+       reduced excess rainfall (runoff) is calculated for the event specified
+       by the passed column.
+    '''
+    adjusted = df[col] - adj_rate                               
+    adjusted[adjusted <  0] = 0                                  
+    capacity = 0                                                    
+    df_adj = pd.DataFrame(adjusted)                                    
+    for i in df_adj.index:
+        capacity+= (df[col].loc[i]-df_adj[col].loc[i])                         
+        if capacity >= max_capacity:                             
+             df_adj[col].loc[i] = df[col].loc[i]       
+    return df_adj
+
+
 def determine_tstep_units(incr_excess: pd.DataFrame) -> dict:
     '''Determines the timestep and the timestep's units of the incremental
        excess runoff.
@@ -1067,7 +1103,7 @@ def combine_results(var: str, outputs_dir: str, AOI: str,
     return dic
     
 
- def combine_metadata(outputs_dir: str, AOI: str, durations: list, 
+def combine_metadata(outputs_dir: str, AOI: str, durations: list, 
         tempEpsilon_dic: dict, convEpsilon_dic: dict, volEpsilon_dic: dict, 
                             BCN: str, remove_ind_dur: bool = True) -> dict:
     '''Combines the metadata files for each duration into a single file for
