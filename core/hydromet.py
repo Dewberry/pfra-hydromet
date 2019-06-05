@@ -907,40 +907,6 @@ def Rename_Final_Groups(curve_weight: dict, dur: int) -> dict:
     return rename_map    
 
 
-def make_rainfall_adjustment(df: pd.DataFrame, col: pd.Series, minrate: float,
-            maxrate: float, min_cap: float=1.0, max_cap: float=1.0, seed: int=None) -> list:
-    '''Randomly selects a stormwater removal rate, calculates the design 
-       capacity, and uses the adjust_excess function to calculate the reduced
-       excess rainfall for the specified event within the passed dataframe.
-    '''
-    if not seed:
-        seed = np.random.randint(low=0, high=10000)
-    np.random.seed(seed)
-    ts = float(df.index[-1])/(df.shape[0]-1)
-    minrate30 = minrate*(ts*2.0)
-    maxrate30 = maxrate*(ts*2.0)
-    adj_rate = np.random.uniform(minrate30, maxrate30)   
-    max_cap = np.random.uniform(min_cap, max_cap)*(adj_rate*(24.0/ts))    
-    adj_excess = adjust_excess(df, col, adj_rate, max_cap)
-    results = [adj_rate, max_cap, adj_excess]
-    return results
-
-
-def adjust_excess(df: pd.DataFrame, col: str, adj_rate: float, 
-                                        max_capacity: float) -> pd.DataFrame:
-    '''Given the stormwater removal rate and the design capacity, the 
-       reduced excess rainfall (runoff) is calculated for the event specified
-       by the passed column.
-    '''
-    adjusted = df[col] - adj_rate                               
-    adjusted[adjusted <  0] = 0                                  
-    capacity = 0                                                    
-    df_adj = pd.DataFrame(adjusted)                                    
-    for i in df_adj.index:
-        capacity+= (df[col].loc[i]-df_adj[col].loc[i])                         
-        if capacity >= max_capacity:                             
-             df_adj[col].loc[i] = df[col].loc[i]       
-    return df_adj
 
 
 def determine_tstep_units(incr_excess: pd.DataFrame) -> dict:
@@ -1063,6 +1029,67 @@ def extract_event_metadata(outfiles: list, events_metadata: dict,
     return metadata
 
 
+def determine_timestep(dic_dur: dict, display_print: bool=True) -> float:
+    '''Calculates the timestep of the rainfall excess data contained within
+       the passed dictionary.
+    '''
+    time_ord = dic_dur['time_idx_ordinate']
+    assert time_ord == 'Hours', 'Timestep is not in units of hours'
+    time_idx = dic_dur['time_idx']
+    timestep = float(time_idx[-1])/(len(time_idx)-1)
+    if display_print: print('Time Step: {0} {1}'.format(timestep, time_ord))
+    return timestep
+
+
+def storm_water_simulator(minrate: float, maxrate: float, ts: float, 
+                        seed: int=None, display_print: bool=True) -> list:
+    '''Adjusts the minimum and maximum stormwater removal rates by the 
+       timestep, randomly selects a stormwater removal rate between the 
+       adjusted minimum and maximum values, and then calculates the maximum
+       stormwater capacity.
+    '''
+    if not seed:
+        seed = np.random.randint(low=0, high=10000)
+    np.random.seed(seed)
+    minrate30 = minrate*(ts*2.0)
+    maxrate30 = maxrate*(ts*2.0)
+    adj_rate = np.random.uniform(minrate30, maxrate30)   
+    maximum_capacity = adj_rate*(24.0/ts)
+    results = [adj_rate, maximum_capacity, seed]
+    if display_print: 
+        print('Rate:', adj_rate, 'Maximum Capacity:', maximum_capacity, 'Seed:', seed)
+    return results 
+
+
+def calculate_reduced_excess(event: list, adj_rate: float, 
+                                                max_capacity: float) -> list:
+    '''Calculates the reduced excess rainfall for the passed event using the
+       adjusted stormwater removal rate and the maximum stormwater capacity.
+    '''
+    reduced_event = event.copy()
+    remaining_cap = max_capacity
+    for i, val in enumerate(event):
+        if remaining_cap > 0: 
+            remainder = val - adj_rate
+            if remainder <= 0.0: 
+                remainder = 0.0
+                remaining_cap -= val
+            if remainder > 0.0:
+                remaining_cap -= adj_rate   
+            if remaining_cap >=0.0:
+                reduced_event[i] = remainder
+            if remaining_cap < 0.0:
+                reduced_event[i] = (remainder-remaining_cap)
+                remaining_cap = 0.0
+                continue
+        elif remaining_cap <=0:
+            reduced_event[i] = val  
+    int_total = np.round(sum(event), 5)
+    f_total = np.round(sum(reduced_event)+max_capacity-remaining_cap, 5) 
+    assert int_total == f_total, 'Check reduced runoff calculation, mass not conserved'
+    return reduced_event
+
+
 def combine_results(var: str, outputs_dir: str, AOI: str, 
             durations: list, tempEpsilon_dic: dict, convEpsilon_dic: dict, 
     volEpsilon_dic: dict, BCN: str=None, remove_ind_dur: bool = True) -> dict:
@@ -1096,10 +1123,9 @@ def combine_results(var: str, outputs_dir: str, AOI: str,
             os.remove(file)    
     if var == 'Weights':
         all_dfs = pd.concat(df_lst)
-        all_dfs = all_dfs.set_index('Unnamed: 0')
-        all_dfs.index.name = ''
+        weights_dic = all_dfs.to_dict()
+        dic = {'BCName': {BCN: weights_dic['Weight']}}
         print('Total Weight:', all_dfs['Weight'].sum())
-        dic = all_dfs.to_dict()
     return dic
     
 
@@ -1115,7 +1141,7 @@ def combine_metadata(outputs_dir: str, AOI: str, durations: list,
         cE = convEpsilon_dic[str(dur)]
         vE = volEpsilon_dic[str(dur)]
         scen='{0}_Dur{1}_tempE{2}_convE{3}_volE{4}'.format(AOI, dur, tE, cE, vE)
-        file = outputs_dir/'{}_{}.json'.format(var, scen)  
+        file = outputs_dir/'Metadata_{0}.json'.format(scen)  
         with open(file) as f:
             md =  json.load(f)
         key = 'H{0}'.format(str(dur).zfill(2))
@@ -1295,26 +1321,23 @@ def plot_grouped_curves(final_curves: dict, y_max: float,
         plt.close(fig)
     return fig
 
-def plot_amount_vs_weight(weights: pd.DataFrame, 
+def plot_amount_vs_weight(weights_dic: dict, 
                                 excess_dic: dict, BCN: str) -> plt.subplots:
     '''Plot the total excess rainfall for each event versus its weight.
     '''
-    n = len(weights)
-    weights['Runoff'] = np.zeros(n)
-    weights['Dur'] = np.zeros(n)
     fig, ax = plt.subplots(1,1, figsize=(24,5))
+    n = 0
     for dur in excess_dic.keys():
-        fdur = float(dur.replace('H',''))
-        for k, v in excess_dic[dur]['BCName'][BCN].items():
-            weights.loc[k]['Runoff'] = sum(v)
-            weights.loc[k]['Dur'] = fdur
-        x = weights[weights['Dur']==fdur]['Weight']    
-        y = weights[weights['Dur']==fdur]['Runoff']
-        ax.plot(x, y, linestyle = '', marker = '.', label = dur)
+        weight = []
+        runoff = []
+        for k in excess_dic[dur]['BCName'][BCN].keys():
+            n+=1
+            runoff.append(sum(excess_dic[dur]['BCName'][BCN][k]))
+            weight.append(weights_dic['BCName'][BCN][k])
+        ax.plot(weight, runoff, linestyle = '', marker = '.', label = dur)
     ax.set_xlabel('Event Weight, [-]')
     ax.set_ylabel('Excess Rainfall, [inches]')
     ax.set_title('Excess Rainfall Amount Versus Event Weight ({} Events)'.format(n))
-    ax.legend()             
-
+    ax.legend()    
 
 #---------------------------------------------------------------------------#
