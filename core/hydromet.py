@@ -1061,8 +1061,7 @@ def storm_water_simulator(minrate: float, maxrate: float, ts: float,
     return results 
 
 
-def calculate_reduced_excess(event: list, adj_rate: float, 
-                                                max_capacity: float) -> list:
+def reduced_excess(event: list, adj_rate: float, max_capacity: float) -> list:
     '''Calculates the reduced excess rainfall for the passed event using the
        adjusted stormwater removal rate and the maximum stormwater capacity.
     '''
@@ -1321,6 +1320,35 @@ def plot_grouped_curves(final_curves: dict, y_max: float,
         plt.close(fig)
     return fig
 
+
+def plot_reduced_excess(ReducedTable: dict, EventsTable: dict, 
+                        durations: list, selected_BCN: str) -> plt.subplot:
+    '''Plot the excess rainfall and reduced excess rainfall for the first two
+       events of each duration within the passed dictionaries.
+    '''
+    n = len(durations)
+    fig, ax = plt.subplots(n, 1, figsize=(18,18))
+    fig.suptitle('Excess Rainfall Reduction by Duration', size = 16)
+    for i, dur in enumerate(durations):
+        idx = ReducedTable[dur]['time_idx']
+        units = ReducedTable[dur]['time_idx_ordinate']
+        dic_re = ReducedTable[dur]['BCName'][selected_BCN]
+        dic_ex = EventsTable[dur]['BCName'][selected_BCN]
+        keys =  list(dic_re.keys())
+        sub_keys = [keys[0], keys[200]]
+        events = []
+        c = ['green', 'blue']
+        for j, k in enumerate(sub_keys):
+            ax[i].plot(idx, dic_ex[k], linestyle = '-', label=k, color=c[j])        
+            ax[i].plot(idx,dic_re[k],linestyle='--',label=f'{k} (Reduced)',color=c[j])   
+        ax[i].set_xlabel('Time, [{}]'.format(units))
+        ax[i].set_ylabel('Excess Rainfall, [inches]')
+        ax[i].grid()
+        ax[i].legend()
+    fig.tight_layout()
+    fig.subplots_adjust(top=0.96)
+
+
 def plot_amount_vs_weight(weights_dic: dict, 
                                 excess_dic: dict, BCN: str) -> plt.subplots:
     '''Plot the total excess rainfall for each event versus its weight.
@@ -1338,6 +1366,8 @@ def plot_amount_vs_weight(weights_dic: dict,
     ax.set_xlabel('Event Weight, [-]')
     ax.set_ylabel('Excess Rainfall, [inches]')
     ax.set_title('Excess Rainfall Amount Versus Event Weight ({} Events)'.format(n))
+    ax.grid()
     ax.legend()    
+
 
 #---------------------------------------------------------------------------#

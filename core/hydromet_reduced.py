@@ -2,20 +2,24 @@ from hydromet import*
 
 
 #---------------------------------------------------------------------------#
-
-def main(durations) -> :
-    '''TBD
+def main(EventsTable: dict, durations: list, BCN: list, minrate: float,
+        maxrate: float, seed: int=None, display_print: bool=True) -> list:
+    '''Calculates the reduced excess rainfall for each event within the 
+       EventsTable dictionary. 
     '''
-    ReducedTable = {}
-    StormwaterTable = {}
+    RTab = {}
+    STab = {}
     SW_variables = {}
-    for dur in durations:
-        dic_dur = EventsTable[dur]
-        time_ord = dic_dur['time_idx_ordinate']
-        time_idx = dic_dur['time_idx']
-        print('Duration:', dur)
+    for d in durations:
+        dic_dur = EventsTable[d]
+        tord = dic_dur['time_idx_ordinate']
+        tidx = dic_dur['time_idx']
+        if display_print: print('Duration:', d)
         ts = determine_timestep(dic_dur, display_print)
-        adj_rate, maximum_capacity, seed = storm_water_simulator(minrate, maxrate, ts, seed, display_print)
+        SW = storm_water_simulator(minrate, maxrate, ts, seed, display_print)
+        rate = SW[0]
+        maxcap = SW[1]
+        seed = SW[2]
         dic_BCN = {}
         dic_BCN_SW = {}
         for name in BCN:
@@ -23,15 +27,16 @@ def main(durations) -> :
             dic_reduced = {}
             dic_stormwater = {}
             for event in dic_events.keys():
-                unreduced = dic_events[event]
-                reduced = calculate_reduced_excess(unreduced, adj_rate, maximum_capacity)
-                dic_reduced[event] = reduced
-                dic_stormwater[event] = list(np.array(unreduced)-np.array(reduced))
+                unred = dic_events[event]
+                red = reduced_excess(unred, rate, maxcap)
+                dic_reduced[event] = red
+                dic_stormwater[event] = list(np.array(unred)-np.array(red))
             dic_BCN[name] = dic_reduced
             dic_BCN_SW[name] = dic_stormwater
-        ReducedTable[dur] = {'time_idx_ordinate':time_ord,'time_idx':time_idx, 'BCName': dic_BCN}
-        StormwaterTable[dur] = {'time_idx_ordinate':time_ord,'time_idx':time_idx, 'BCName': dic_BCN_SW}
-        SW_variables[dur] = {'Rate': adj_rate, 'Capacity': maximum_capacity, 'Seed':seed}
+        RTab[d] = {'time_idx_ordinate':tord,'time_idx':tidx,'BCName':dic_BCN}
+        STab[d]={'time_idx_ordinate':tord,'time_idx':tidx,'BCName':dic_BCN_SW}
+        SW_variables[d] = {'Rate': rate, 'Capacity': maxcap, 'Seed':seed}
+    results = [RTab, STab, SW_variables]
     return results
 
 if __name__== "__main__":
