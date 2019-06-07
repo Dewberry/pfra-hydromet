@@ -328,7 +328,7 @@ def find_optimal_curve_std(df: pd.DataFrame, lower: str=r'Lower (90%)',
 
 
 def RandomizeData(df: pd.DataFrame, number: int, outputs_dir: str, 
-    filename: str, dur: int, seed: int=None, sampling_distro: str='Lognorm',
+    filename: str, dur: int=None, seed: int=None, sampling_distro: str='Lognorm',
                     variable: str='Precipitation', lower: str=r'Lower (90%)', 
                                 upper: str=r'Upper (90%)', plot: bool=False, 
                                 display_print: bool=True) -> pd.DataFrame:
@@ -905,8 +905,6 @@ def Rename_Final_Groups(curve_weight: dict, dur: int) -> dict:
                 rename_map[k] = ID 
                 num+=1
     return rename_map    
-
-
 
 
 def determine_tstep_units(incr_excess: pd.DataFrame) -> dict:
