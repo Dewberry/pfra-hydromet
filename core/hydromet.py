@@ -1039,18 +1039,14 @@ def determine_timestep(dic_dur: dict, display_print: bool=True) -> float:
     return timestep
 
 
-def storm_water_simulator(minrate: float, maxrate: float, ts: float, 
+def storm_water_simulator(minrate30: float, maxrate30: float, ts: float, 
                         seed: int=None, display_print: bool=True) -> list:
-    '''Adjusts the minimum and maximum stormwater removal rates by the 
-       timestep, randomly selects a stormwater removal rate between the 
-       adjusted minimum and maximum values, and then calculates the maximum
-       stormwater capacity.
+    '''Randomly selects a stormwater removal rate between the minimum and
+       maximum values and then calculates the maximum stormwater capacity.
     '''
     if not seed:
         seed = np.random.randint(low=0, high=10000)
     np.random.seed(seed)
-    minrate30 = minrate*(ts*2.0)
-    maxrate30 = maxrate*(ts*2.0)
     adj_rate = np.random.uniform(minrate30, maxrate30)   
     maximum_capacity = adj_rate*(24.0/ts)
     results = [adj_rate, maximum_capacity, seed]
