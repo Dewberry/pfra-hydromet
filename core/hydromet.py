@@ -344,8 +344,8 @@ def RandomizeData(df: pd.DataFrame, number: int, outputs_dir: str,
     df = df.copy()
     if variable=='CN':
         df_filled=pd.DataFrame(index=np.arange(1, number+1, 1))
-        df=df_filled.join(df, how='outer')
-        df=df.fillna(method='ffill')
+        df = df_filled.join(df, how='outer')
+        df = df.fillna(method='ffill')
     if not seed:
         seed = np.random.randint(low=0, high=10000)
     np.random.seed(seed)
@@ -360,7 +360,7 @@ def RandomizeData(df: pd.DataFrame, number: int, outputs_dir: str,
     rand_data = [col for col in df.columns.tolist() if 'Random' in col]
     if os.path.isdir(outputs_dir)==False:
         os.mkdir(outputs_dir)
-    if variable=='Precipitation': 
+    if variable == 'Precipitation': 
         df_rename = df.copy()
         df_rename.index.name ='Tr'
     elif variable == 'CN':
@@ -479,19 +479,17 @@ def populate_event_precip_data(random_cns: pd.DataFrame,
         t_curve=curve_group['q{}'.format(int(orig_q))]['{}%'.format(decile)]
         rand_rain = t_curve*precip/100
         if dur < 24 and adjust_CN_less24:
-            adj_CN, adj_s, adj_ia = update_CN(cn, dur, precip)
-            excess = rand_rain.apply(calculate_excess, args=(adj_ia, adj_s))
+            adj_CN, s, ia = update_CN(cn, dur, precip)
         else:
             s  = S_24hr(cn)
             ia = IA_24hr(s)
-            excess = rand_rain.apply(calculate_excess, args=(ia, s))
+        excess = rand_rain.apply(calculate_excess, args=(ia, s))
         runid='E{}_'.format(event)+'{}Hr_'.format(dur)+'Q{}_'.format(int(orig_q))+'D{}_'.format(decile)+'CN{}'.format(cn)
         sim_ID = 'E{}'.format(simID) 
         events_log[sim_ID] = runid 
         output_precip_data[sim_ID] = rand_rain
         cum_excess[sim_ID] = excess
-        corrected_incremental = adjust_incremental(rand_rain, excess)
-        incr_excess[sim_ID] = corrected_incremental
+        incr_excess[sim_ID] = adjust_incremental(rand_rain, excess)
     return output_precip_data, cum_excess, incr_excess, events_log
 
 
@@ -736,9 +734,9 @@ def calc_mean_curves(curve_group: dict,
     updated_curves = {}
     for k, v in curve_group.items():
         v_lst = extract_list(v)
-        like_slice = dataslice[v_lst] 
+        like_slice =  [v_lst] 
         mean_curve = like_slice.mean(axis=1)
-        updated_curves[k]=mean_curve
+        updated_curves[k] = mean_curve
     df_updated_curves = pd.DataFrame.from_dict(updated_curves)    
     return df_updated_curves
 
