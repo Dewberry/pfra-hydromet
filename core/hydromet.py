@@ -493,6 +493,41 @@ def populate_event_precip_data(random_cns: pd.DataFrame,
     return output_precip_data, cum_excess, incr_excess, events_log
 
 
+def calc_excess_rainfall(eventID: dict, precip: dict, 
+                                        random_cns: pd.DataFrame, idur: int,  
+                                    adjust_CN_less24: bool=False) -> list:
+    '''Calculates cumulative and incremental runoff for each event using a 
+       randomly selected precipitation amount, quartile specific temporal 
+       distribution, and curve number. This function performs the same 
+       calculations as populate_event_precip_data but is employed by 
+       the distalEventsTable.ipynb.
+    '''
+    count = 0
+    for k, v in eventID.items():
+        if count == 0:
+            idx = [float(i) for i in list(precip[v].keys())]
+            final_precip = pd.DataFrame(index = idx)
+            cum_excess = pd.DataFrame(index = idx)
+            incr_excess = pd.DataFrame(index = idx)
+            count+=1
+        excess = []
+        cum_precip = list(precip[v].values())
+        total_precip = cum_precip[-1]
+        cn = random_cns.loc[int(k)]['Random CN']
+        if idur < 24 and adjust_CN_less24:
+            adj_cn, s, ia = update_CN(cn, idur, total_precip)
+        else:
+            s  = S_24hr(cn)
+            ia = IA_24hr(s)
+        for p in cum_precip:
+            excess.append(calculate_excess(p, ia, s))
+        cum_excess[v] = excess
+        final_precip[v] = cum_precip
+        incr_excess[v] = adjust_incremental(final_precip[v], cum_excess[v])
+    results = [cum_excess, final_precip, incr_excess] 
+    return results
+
+
 def update_CN(CN: int, duration: int, 
                         grid_avg_precip: float) -> (int, float, float):
     '''Adjusts the curve number (CN), potential maximum retention after 
@@ -734,7 +769,7 @@ def calc_mean_curves(curve_group: dict,
     updated_curves = {}
     for k, v in curve_group.items():
         v_lst = extract_list(v)
-        like_slice =  [v_lst] 
+        like_slice =  dataslice[v_lst] 
         mean_curve = like_slice.mean(axis=1)
         updated_curves[k] = mean_curve
     df_updated_curves = pd.DataFrame.from_dict(updated_curves)    
@@ -1142,6 +1177,37 @@ def combine_metadata(outputs_dir: str, AOI: str, durations: list,
             os.remove(file)
     return dic   
     
+
+def combine_distal_results(outfiles: list, var: str, BCN: list, 
+                        ordin: str='Hours', remove_ind_dur: bool=True) -> dict:
+    '''Combines the excess rainfall results and metadata for each duration 
+       into a single file for all durations.
+    '''
+    assert len(BCN)==1, 'Update function to handle multiple boundary conditions'
+    dic = {}
+    for file in outfiles:
+        if var=='Excess' and 'Excess' in str(file):
+            dur = int(str(file).split('_')[4].replace('Dur', ''))
+            df = pd.read_csv(file, index_col = 0)
+            df_dic = df.to_dict()
+            dates = list(df.index)
+            events = {}
+            for k, v in df_dic.items():
+                if 'E' in k:
+                    events[k] = list(v.values())
+            val = {'time_idx_ordinate': ordin, 'time_idx': dates, 'BCName': {BCN[0]: events}}  
+        elif var=='Metadata' and 'Metadata' in str(file):
+            dur = int(str(file).split('_')[3].replace('Dur', ''))
+            with open(file) as f:
+                md =  json.load(f)
+            val = {'BCName': {BCN[0]: md}}
+        else:
+            continue        
+        key ='H{0}'.format(str(dur).zfill(2))
+        dic[key] = val
+        if remove_ind_dur:
+             os.remove(file)
+    return dic
 
 #---------------------------------------------------------------------------#
 # Plotting Functions
