@@ -287,6 +287,7 @@ def scipy_interp(raw_precip: pd.DataFrame, df: pd.DataFrame,
     df[ynew] =np.exp(f(df['Log10_ARI']))
     return df
 
+
 def find_optimal_curve_std(df: pd.DataFrame, lower: str=r'Lower (90%)', 
             upper: str=r'Upper (90%)', sdev: float=0.15) -> pd.DataFrame:
     '''Calculates/optimizes the standard deviation of the lognormal 
@@ -296,9 +297,7 @@ def find_optimal_curve_std(df: pd.DataFrame, lower: str=r'Lower (90%)',
        statistic (this statistic is minimized). Note that the sdev is the 
        initial estimate of the standard deviation. The fitted values should
        be compared to the lower and upper confidence limits/values to 
-       validate the optimization. Note: additional code exists at the end of 
-       the script containing this function which can be edited in order to 
-       improve the fit of the standard devation for CN.
+       validate the optimization. 
     '''
     df = df.copy()
     for i, val in enumerate(df.index):
@@ -324,124 +323,110 @@ def find_optimal_curve_std(df: pd.DataFrame, lower: str=r'Lower (90%)',
                                             final_st_d, scale=x[3]).ppf(0.9)
     return df
 
-def find_optimal_curve_beta_dist_S(df: pd.DataFrame, lower: str=r'Lower (90%)', 
-            upper: str=r'Upper (90%)', alpha: float=2, beta: float=10, CN_min: float=10) -> pd.DataFrame:
-    '''Calculates/optimizes the parameters (alpha and beta) of the beta distribution 
-       distribution representing the potential retention, S, normalized by an upper 
-       limit of the maximum potential retention, Smax, i.e., S/Smax. The upper limit, Smax, 
-       is based on a CN=10, which is a reasonable lower limit based on the TR-55 and Ponce 1996
-       "Runoff Curve Number: Has It Reached Maturity?". Note that S=1000/CN-10. The fit
-       is based on the respective CN value for the antecedent moisture conditions (AMC) I, II, and III
-       For each respective CN AMC, the corresponding potential retention, S, respresents the 10% quantile, 
-       modal value, and 90% quantile of the beta distribution. The sum of the squared residuals
-       of the 10% quantile, 90% quantile and modal value is used as the test 
-       statistic (this statistic is minimized). Note that the alphan and beta represent 
-       initial estimates. The fitted values should
-       be compared to the lower and upper confidence limits/values to 
-       validate the optimization.
+
+def find_optimal_curve_beta_dist_S(df: pd.DataFrame, alpha: float=2.0,
+          beta: float=10.0, CN_min: int=10, Delta_CN: int=20) -> pd.DataFrame:
+    '''Calculates/optimizes the parameters (alpha and beta) of the beta 
+       distribution representing the potential retention, S, normalized by an
+       upper limit of the maximum potential retention, Smax, i.e. S/Smax. The
+       upper limit, Smax, is based on a CN = 10, which is a reasonable lower 
+       limit based on the TR-55 and Ponce 1996 "Runoff Curve Number: Has It 
+       Reached Maturity?". Note that S=(1000/CN)-10. The fit is based on the
+       respective CN value for the antecedent moisture conditions (AMC) I, II,
+       and III. For each respective CN AMC, the corresponding potential 
+       retention, S, respresents the 10% quantile, model value, and 90% 
+       quantile of the beta distribution. The sum of the squared residuals of
+       the 10% quantile, 90% quantile and modal value is used as the test 
+       statistic (this statistic is minimized). Note that the alpha and beta 
+       represent initial estimates. The fitted values should be compared to 
+       the lower and upper confidence limits/values to validate the 
+       optimization.
     '''
-    df = df.copy()
-    
-    ''' Not Used: max(df.iloc[0]['Lower']-10,10)  and CNmin = 10'''
-    
-    SmaxH = 1000/10-10
-    Delta_CN=20 
+    df = df.copy()                                                                                
     '''max difference between 10% quantile CN and lower limit'''
-    
     for i, val in enumerate(df.index):
-        '''Note that the CN are converted to potential retention values, S, following 
-    the typical formula 1000/CN-10 and then the value are normalized by Smax.
-            '''
-        x = np.array([(1000/df.iloc[i][lower]-10) , (1000/df.iloc[i]['AMC II']-10) , 
-                      (1000/df.iloc[i][upper]-10), alpha, beta,  1000/CN_min-10])
-        
+        x = np.array([((1000/df.iloc[i]['AMC I (Dry)'])-10), 
+                                          ((1000/df.iloc[i]['AMC II'])-10), 
+                        ((1000/df.iloc[i]['AMC III (Wet)'])-10), alpha, beta, 
+                                      ((1000/df.iloc[i]['AMC I (Dry)'])-10)])
         def objective_find_std(x: np.ndarray) -> float:
-            '''Calculates the sum of the squared residuals for the lower 
-               and upper 90% confidence limits given the standard deviation 
-               and expected value of the lognormal distribution. 
+            '''Calculates the sum of the squared residuals for ACM I, AMC II,
+               and AMC III curve numbers given the alpha and beta parameters
+               of the beta distribution and Smax. 
             '''
-            return np.power(x[5]*stats.beta(x[3],x[4]).ppf(0.9)-
-                x[0],2)+np.power(x[5]*(x[3]-1)/(x[3]+x[4]-2)-x[1],2)+np.power(x[5]*stats.beta(x[3],x[4]).ppf(0.1)-x[2],2)
-        
-        '''The bounds only allow the parameters alpha and beta of the Beta Distribution
-        to change in the opimization
-            '''
-        bounds = (( (1000/df.iloc[i][lower]-10), (1000/df.iloc[i][lower]-10)), 
-                   ( (1000/df.iloc[i]['AMC II']-10), (1000/df.iloc[i]['AMC II']-10) ),
-            (  (1000/df.iloc[i][upper]-10),  (1000/df.iloc[i][upper]-10) ),  (1.01, None),  (1.01, None) ,
-                  (1000/df.iloc[i][lower]-10, 1000/(max(df.iloc[0][lower]-Delta_CN,1))-10 ) )  
-        
+            return np.square(x[5]*stats.beta(x[3], x[4]).ppf(0.9)-                                   
+              x[0])+np.square(x[5]*(x[3]-1)/(x[3]+x[4]-2)-
+              x[1])+np.square(x[5]*stats.beta(x[3], x[4]).ppf(0.1)-x[2])
+
+
+        bounds = ((x[0], x[0]), (x[1], x[1]), (x[2], x[2]), (1.01, None), 
+                                                              (1.01, None), 
+                (x[0], 1000/(max(df.iloc[0]['AMC I (Dry)']-Delta_CN, 1))-10))  
+
         solution = minimize(objective_find_std, x, method='SLSQP', 
                                                             bounds=bounds)
         final_alpha = solution.x[3]
         final_beta = solution.x[4]
-        final_S_limit=solution.x[5]
-        
+        final_S_limit = solution.x[5]
         df.loc[val, 'alpha'] = final_alpha
         df.loc[val, 'beta'] = final_beta
         df.loc[val, 'CN Lower Limit'] = 1000/(final_S_limit+10)
-        df.loc[val, r'Fitted  {0}'.format(lower)] = 1000/(10+final_S_limit*stats.beta(
+        df.loc[val, r'Fitted AMC I (Dry)'] = 1000/(10+final_S_limit*stats.beta(
                                             final_alpha, final_beta).ppf(0.9))
-        df.loc[val, r'Fitted AMC II'] = 1000/(10+final_S_limit*((final_alpha-1)/(final_alpha+final_beta-2)))
-        df.loc[val, r'Fitted  {0}'.format(upper)] = 1000/(10+final_S_limit*stats.beta(
+        df.loc[val, r'Fitted AMC II'] = 1000/(10+final_S_limit*((final_alpha-
+                                                1)/(final_alpha+final_beta-2)))
+        df.loc[val, r'Fitted AMC III (Wet)'] = 1000/(10+final_S_limit*stats.beta(
                                             final_alpha, final_beta).ppf(0.1))
     return df
 
+
 def RandomizeData(df: pd.DataFrame, number: int, outputs_dir: str, 
-    filename: str, dur: int, seed: int=None, sampling_distro: str='Lognorm',
-                    variable: str='Precipitation', lower: str=r'Lower (90%)', 
-                                upper: str=r'Upper (90%)', plot: bool=False, 
-                                display_print: bool=True) -> pd.DataFrame:
-    '''Randomly selects a value (precipitation or curve number) from the log-
-       normal distribution given the expected value and optimized standard 
-       devation for each recurrance interval/event.
+  filename: str, dur: int, seed: int=None, variable: str='Precipitation',
+                   plot: bool=False, display_print: bool=True) -> pd.DataFrame:
+    '''Randomly selects a precipitation amount from the log-normal 
+       distribution given the expected value and optimized standard devation 
+       or a curve number from the beta distribution given the AMC II value and
+       the optimized parameters for each recurrance interval/event.
     '''
-    assert sampling_distro=='Lognorm', ("Check distribution, currently only"
-                                    "Lognorm available. No results computed")
-    assert variable=='Precipitation' or variable=='CN', ("Check variable,"
+    assert variable == 'Precipitation' or variable == 'CN', ("Check variable,"
                                         "currently only precipitation or CN"
                                             "available. No results computed")
     df = df.copy()
-    if variable=='CN':
-        df_filled=pd.DataFrame(index=np.arange(1, number+1, 1))
-        df=df_filled.join(df, how='outer')
-        df=df.fillna(method='ffill')
     if not seed:
-        seed = np.random.randint(low=0, high=10000)
+        seed = np.random.randint(low = 0, high = 10000)
     np.random.seed(seed)
     current_col = 'Random {}'.format(variable)
-    
-    
-    if variable=='CN':
-        S_limit=1000/df.iloc[0]['CN Lower Limit']-10
-        STable= S_limit*np.random.beta(df['alpha'], df['beta'], size=number)
-        CNTable=1000/(STable+10)
+    if variable == 'CN':
+        df_filled = pd.DataFrame(index = np.arange(1, number+1, 1))
+        df = df_filled.join(df, how = 'outer')
+        df = df.fillna(method='ffill')
+        S_limit = 1000/df.iloc[0]['CN Lower Limit']-10
+        STable = S_limit*np.random.beta(df['alpha'], df['beta'], size=number)
+        CNTable = 1000/(STable+10)
         df[current_col] = CNTable
+        df[current_col] = df[current_col].apply(lambda x: int(x))
+        df_rename = df.copy()
+        df_rename.index.name ='E'
     if variable=='Precipitation': 
         df[current_col] = np.random.lognormal(np.log(df['Expected Value']), 
                                                     df['Sigma'], size=number)
-        idx = df[df[current_col] < df[lower]].index 
-        df.loc[idx, current_col] = df.loc[idx, lower]
-        idx = df[df[current_col] > df[upper]].index
-        df.loc[idx, current_col] = df.loc[idx, upper]
-    
-    if variable=='CN': df[current_col]=df[current_col].apply(lambda x: int(x))
-    rand_data = [col for col in df.columns.tolist() if 'Random' in col]
-    if os.path.isdir(outputs_dir)==False:
-        os.mkdir(outputs_dir)
-    if variable=='Precipitation': 
+        idx = df[df[current_col] < df['Lower (90%)']].index 
+        df.loc[idx, current_col] = df.loc[idx, 'Lower (90%)']
+        idx = df[df[current_col] > df['Upper (90%)']].index
+        df.loc[idx, current_col] = df.loc[idx, 'Upper (90%)']
         df_rename = df.copy()
         df_rename.index.name ='Tr'
-    elif variable == 'CN':
-        df_rename = df.copy()
-        df_rename.index.name ='E'
-        if display_print: 
-            print(display(df[rand_data].head(2)))    
+    rand_data = [col for col in df.columns.tolist() if 'Random' in col]
+    if os.path.isdir(outputs_dir) == False:
+        os.mkdir(outputs_dir)
     df_rename.to_csv(outputs_dir/filename) 
     if display_print: 
             print('{0} - Seed:'.format(variable), seed) 
+            if variable == 'CN':
+              print(display(df[rand_data].head(2)))    
     if plot: plot_rand_precip_data(df, rand_data, dur)
     return df[rand_data]
+
 
 def join_rdata_tables(rdata_tables: list, type: str, 
                                 display_print: bool=True) -> pd.DataFrame:
@@ -511,15 +496,18 @@ def map_quartiles_deciles(n_samples: int=75, seed: int=None,
 
 
 def prep_cn_table(CN: int, arc_data: dict) -> pd.DataFrame:
-    '''Constructs a dataframe with the AMC II curve number (CN), 
-       the dry/lower CN (AMC I), and the wet/upper CN (AMC III). The dry (AMC I), AMC II,  and wet (AMC III) 
-       curve numbers refer to different antecedent soil moisture conditions governing runoff, which
-       were obtained from NEH Part 630, Chapter 10, Table 10-1
+    '''Constructs a dataframe with the AMC II curve number (CN), the dry/lower
+       CN (AMC I), and the wet/upper CN (AMC III). The AMC I, AMC II, and AMC 
+       III curve numbers refer to different antecedent soil moisture 
+       conditions governing runoff, which were obtained from 
+       NEH Part 630, Chapter 10, Table 10-1
        (https://www.wcc.nrcs.usda.gov/ftpref/wntsc/H&H/NEHhydrology/ch10.pdf)
     '''
-    dic={'AMC I (Dry)': arc_data['Dry'], 'AMC II': CN, 'AMC III (Wet)': arc_data['Wet']}
-    df=pd.DataFrame(dic, index=[1])
+    dic = {'AMC I (Dry)': arc_data['Dry'], 'AMC II': CN, 
+                                            'AMC III (Wet)': arc_data['Wet']}
+    df = pd.DataFrame(dic, index = [1])
     return df
+
 
 def populate_event_precip_data(random_cns: pd.DataFrame, 
     temporals: pd.DataFrame, random_precip_table: pd.DataFrame,
