@@ -1040,7 +1040,11 @@ def excess_df_to_input(outputs_dir: str, df: pd.DataFrame, tstep: float,
             m_dtm = start_date
             event_data = df[col]
             for j, idx in enumerate(event_data.index):
-                if j > 0: m_dtm+=pd.Timedelta(hours = tstep)
+                if j > 0: 
+                    if tstep_units == 'MIN': 
+                        m_dtm+=pd.Timedelta(minutes = tstep)
+                    elif tstep_units == 'HOUR': 
+                        m_dtm+=pd.Timedelta(hours = tstep)
                 htime_string = datetime.strftime(m_dtm, '%d%b%Y %H%M')
                 runoff = event_data.loc[idx]
                 f.write('"{}"'.format(scen_name)+' '+col+' '+htime_string+' '+str(runoff)+'\n')
