@@ -382,7 +382,7 @@ def find_optimal_curve_beta_dist_S(df: pd.DataFrame, alpha: float=2.0,
 
 
 def RandomizeData(df: pd.DataFrame, number: int, outputs_dir: str, 
-  filename: str, dur: int, seed: int=None, variable: str='Precipitation',
+  filename: str, dur: int=24, seed: int=None, variable: str='Precipitation',
                    plot: bool=False, display_print: bool=True) -> pd.DataFrame:
     '''Randomly selects a precipitation amount from the log-normal 
        distribution given the expected value and optimized standard devation 
@@ -763,7 +763,7 @@ def conv_ts(curve_test_df: pd.DataFrame,
        Note that in this function's code, "c" and "nc" refer to "column" 
        and "next column", respectively.
     '''
-    df=curve_test_df.copy()
+    df = curve_test_df.copy()
     test_dic = {}
     test_values = []
     for i, c in enumerate(df.columns):

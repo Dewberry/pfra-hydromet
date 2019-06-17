@@ -28,9 +28,9 @@ def main(md: dict, dur: str, name: str, CN: int, arc_data: dict, AOI: str,
     convEpsilon = params['convEpsilon']
     volEpsilon = params['volEpsilon']
     df_CN = prep_cn_table(CN, arc_data) 
-    fitted_cn = find_optimal_curve_std(df_CN, 'Lower', 'Upper')
+    fitted_cn = find_optimal_curve_beta_dist_S(df_CN)
     fn_CN = "Rand_CN_distal_{0}_Dur{1}_tempE{2}_convE{3}_volE{4}_Se{5}.csv".format(AOI, idur, tempEpsilon, convEpsilon, volEpsilon, seed)
-    random_cns = RandomizeData(fitted_cn, n_rand_events, outputs_dir, fn_CN, seed=seed, variable='CN', lower='Lower', upper='Upper', display_print=False)
+    random_cns = RandomizeData(fitted_cn, n_rand_events, outputs_dir, fn_CN, seed = seed, variable = 'CN', display_print = False)
     cum_excess, final_precip, incr_excess = calc_excess_rainfall(eventID, precip, random_cns, idur, adjust_CN_less24)
     final_curves = calc_mean_curves(groups, incr_excess) 
     fn_Excess = 'Excess_Rainfall_distal_{0}_Dur{1}_tempE{2}_convE{3}_volE{4}.csv'.format(AOI, idur, tempEpsilon, convEpsilon, volEpsilon)
