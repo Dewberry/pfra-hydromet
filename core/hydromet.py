@@ -16,6 +16,7 @@ from zipfile import ZipFile
 from datetime import datetime
 from collections import Counter
 logging.basicConfig(level=logging.ERROR)
+from IPython.display import display, Markdown
 
 import numpy as np
 import pandas as pd
@@ -1520,6 +1521,129 @@ def plot_amount_vs_weight(weights_dic: dict,
     ax.set_title('Excess Rainfall Amount Versus Event Weight ({} Events)'.format(n))
     ax.grid()
     ax.legend()    
+
+
+def plot_tempEpsilons(events: pd.DataFrame, event_of_interest: str, 
+				tempEpsilons: list, duration: int, verbose: bool=True) -> None:
+    '''Plot the incremental excess rainfall curve for each tempEpsilon. 
+    '''
+    fig, ax = plt.subplots(figsize=(24, 5))
+    ax.plot(events.index, events[event_of_interest], color='black',
+    										 linewidth='1', label='Original') 
+    for e in tempEpsilons:
+        adj_tempEpsilon = convert_tempEpsilon(e, events)
+        if verbose: print('{0} hours is {1} '
+        							'timesteps'.format(e, adj_tempEpsilon))
+        tstep = events.index[-1]/(events.shape[0]-1)
+        events_resampled = prep_data_for_convolution(events, adj_tempEpsilon)
+        idx=np.arange(0,duration+adj_tempEpsilon*tstep,adj_tempEpsilon*tstep)
+        ax.plot(idx, np.insert(list(events_resampled.iloc[:,0]), 0, 0),
+        		linewidth='1', label='tempEpsilon = {}'.format(e), alpha=0.75)
+    ax.grid()
+    ax.set_xlabel('Duration, [hours]')
+    ax.set_ylabel('Incremental Excess, [inches/timestep]')
+    ax.set_title('Excess Rainfall', size = 18)
+    ax.legend(prop={'size': 9}) 
+
+
+def plot_convEpsilon(events: pd.DataFrame, e1: str,
+				e2: str, duration: int, tempEpsilon: float, 
+							convEpsilon: float, verbose: bool=True) -> float:
+    '''Calculates the percent difference between the two curves at each 
+       timestep, the maximum percent difference, and the summary statistic 
+       (st1), and then plots the excess rainfall events and their percent 
+       differences relative to convEpsilon.
+    '''
+    adj_tempEpsilon = convert_tempEpsilon(tempEpsilon, events)
+    resampled = prep_data_for_convolution(events, adj_tempEpsilon)
+    perc_dif = abs(resampled[e1]-resampled[e2])/((resampled[e1]
+    												+resampled[e2])/2.0)*100.0
+    max_perc_dif = perc_dif.max() 
+    st1 = (convEpsilon-max_perc_dif)/convEpsilon
+    if verbose: display(Markdown('$t_c:$')); print(st1)
+    tstep = events.index[-1]/(events.shape[0]-1)
+    idx=np.arange(0,duration+adj_tempEpsilon*tstep,adj_tempEpsilon*tstep)
+    fig, ax = plt.subplots(1, 2, figsize = (24, 5))
+    ax[0].plot(idx, np.insert(list(resampled[e1]), 0, 0), label = e1)
+    ax[0].plot(idx, np.insert(list(resampled[e2]), 0, 0), label = e2) 
+    ax[0].set_title('Excess Rainfall Events', fontsize=18)
+    ax[0].set_xlabel('Time, [hours]', fontsize = 18)
+    ax[0].set_ylabel('Incremental Excess, [inches]', fontsize=18)
+    ax[0].grid()
+    ax[0].legend(prop={'size': 9})
+    ax[1].plot(idx, np.insert(list(perc_dif), 0, 0), color = 'black',
+    														 label = '% Dif')
+    ax[1].plot(idx[perc_dif.idxmax()+1], max_perc_dif, linestyle = '', 
+    						marker = '.', markersize = 12, color = 'orange',
+    	 		label = 'Max % Dif = {}'.format(np.round(max_perc_dif, 2)))
+    ax[1].plot(idx, np.ones(len(idx))*convEpsilon, color = 'red', 
+    						label = 'convEpsilon = {0}'.format(convEpsilon))
+    ax[1].set_title('Percent Difference between {0} and '
+    										'{1}'.format(e1, e2), fontsize=18)
+    ax[1].set_xlabel('Time, [hours]', fontsize = 18)
+    ax[1].set_ylabel('% Dif, [-]', fontsize=18)
+    ax[1].grid()
+    ax[1].legend(prop={'size': 9}) 
+    return st1
+
+
+def plot_volEpsilon(events: pd.DataFrame, e1: str, e2: str, duration: int, 
+		tempEpsilon: float, volEpsilon: float, verbose: bool=True) -> float:
+    '''Calculates the cumulative curves for the two events, the percent 
+       difference at each timestep, the total percent difference (percent 
+       difference at the final timestep), and the summary statistic (st2), 
+       and then plots the cumulative excess rainfall events and their percent
+       differences relative to volEpsilon.
+    '''
+    adj_tempEpsilon = convert_tempEpsilon(tempEpsilon, events)
+    events_resampled = prep_data_for_convolution(events, adj_tempEpsilon)
+    tstep = events.index[-1]/(events.shape[0]-1)
+    idx = np.arange(0, duration+adj_tempEpsilon*tstep, adj_tempEpsilon*tstep)
+    cum_e1 = events_resampled[e1].cumsum()
+    cum_e2 = events_resampled[e2].cumsum()
+    perc_dif = list(abs(cum_e1-cum_e2)/((cum_e1+cum_e2)/2.0)*100)
+    perc_dif_total = perc_dif[-1]
+    st2 = (volEpsilon-perc_dif_total)/volEpsilon
+    if verbose: display(Markdown('$t_v:$')); print(st2)
+    fig, ax = plt.subplots(1, 2, figsize = (24, 5))
+    ax[0].plot(idx, np.insert(list(cum_e1), 0, 0), label = e1)
+    ax[0].plot(idx, np.insert(list(cum_e2), 0, 0), label = e2) 
+    ax[0].set_title('Excess Rainfall Events', fontsize=18)
+    ax[0].set_xlabel('Time, [hours]', fontsize = 18)
+    ax[0].set_ylabel('Cumulative Excess, [inches]', fontsize=18)
+    ax[0].grid()
+    ax[0].legend(prop={'size': 9}) 
+    ax[1].plot(idx, np.insert(perc_dif, 0, 0), color = 'black', 
+    												label = 'Total % Dif')
+    ax[1].plot(idx[-1], perc_dif_total, linestyle = '', marker = '.', 
+    										markersize = 12, color = 'orange', 
+    		label = 'Total % Dif = {}'.format(np.round(perc_dif_total, 2)))
+    ax[1].plot(idx[-1], volEpsilon, linestyle = '', marker = '_', 
+    										markersize = 12, color = 'red', 
+    							label = 'volEpsilon = {0}'.format(volEpsilon))
+    ax[1].set_ylabel('% Dif, [-]', fontsize=18)
+    ax[1].set_xlabel('Time, [hours]', fontsize = 18)
+    ax[1].set_title('Percent Difference between {0} and '
+    										'{1}'.format(e1, e2), fontsize=18)
+    ax[1].grid()
+    ax[1].legend(prop={'size': 9}) 
+    return st2
+
+
+def plot_test_statistic(delta: int=0.05, vmin: float=-1.0, vmax: float=1.0) -> None:
+    '''Plot a heat map of the test statistic as a funtion of the individual 
+       summary statistics (t_c and t_v)
+    '''
+    tv, tc = np.mgrid[slice(0, 1 + delta, delta), 
+                      slice(0, 1 + delta, delta)]
+    t = 1 - np.sqrt((tc-1)**2+(tv-1)**2)
+    fig, ax = plt.subplots(figsize = (9,6))
+    c = ax.pcolormesh(tc, tv, t, cmap='RdBu', vmin=vmin, vmax=vmax)
+    ax.set_xlabel('$t_c$', fontsize = 14)
+    ax.set_ylabel('$t_v$', fontsize = 14)
+    ax.set_title('Test Statistic as a Function of $t_c$ and '
+    													'$t_v$', fontsize=18)
+    fig.colorbar(c)
 
 
 def plot_cum_precip_or_excess(df: pd.DataFrame, var: str='Precip') -> None:
