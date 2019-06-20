@@ -1,6 +1,7 @@
 import os
 import io
 import re
+import csv
 import json
 import time
 import urllib
@@ -14,7 +15,6 @@ import scrapbook as sb
 from zipfile import ZipFile
 from datetime import datetime
 from collections import Counter
-warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.ERROR)
 
 import numpy as np
@@ -691,7 +691,15 @@ def convert_tempEpsilon(tempEpsilon: float, incr_excess: pd.DataFrame) -> int:
        corresponding timesteps.
     '''
     tstep = incr_excess.index[-1]/(incr_excess.shape[0]-1)
-    adj_tempEpsilon = int(tempEpsilon/tstep)
+    adj_tempEpsilon = tempEpsilon/tstep
+    if adj_tempEpsilon<1:
+        warnings.warn("tempEpsilon less than the number of hours in a "
+                            "timestep, adj_tempEpsilon set to 1 timestep")
+        adj_tempEpsilon = 1
+    elif not (adj_tempEpsilon).is_integer():
+        warnings.warn("Number of timesteps not an integer, adj_tempEpsilon" 
+                                    "rounded down to the closest integer")   
+    adj_tempEpsilon = int(adj_tempEpsilon)
     return adj_tempEpsilon
 
 
@@ -735,7 +743,7 @@ def prep_data_for_convolution(dataslice: pd.DataFrame,
         curve_result = test_shapes(dataslice, col, adj_tempEpsilon) 
         curve_test_dict[col] = curve_result
     curve_test_df = pd.DataFrame.from_dict(curve_test_dict, orient='index').T
-    curve_test_df_nanzero=curve_test_df.fillna(0)
+    curve_test_df_nanzero = curve_test_df.fillna(0)
     return curve_test_df_nanzero
 
 
@@ -1269,6 +1277,31 @@ def combine_distal_results(outfiles: list, var: str, BCN: list,
              os.remove(file)
     return dic
 
+
+def dict_to_df(dic: dict, display_head: bool=True) -> pd.DataFrame:
+    '''Convert a dictionary of lists of non-equal length or individual
+       floats/integers to a dataframe.
+    '''
+    count = 1
+    for k, v in dic.items():
+        if count==1:
+            df = pd.DataFrame()
+            if type(v)==int or type(v)==float:
+                df[k] = [v]
+            else:
+                df[k] = v
+            count+=1
+        else:
+            df1 = pd.DataFrame()
+            if type(v)==int or type(v)==float:
+                df1[k] = [v]
+            else:
+                df1[k] = v
+            df = df.join(df1)
+    if display_head: print(display(df.head()))    
+    return df
+
+
 #---------------------------------------------------------------------------#
 # Plotting Functions
 #---------------------------------------------------------------------------#
@@ -1453,7 +1486,8 @@ def plot_reduced_excess(ReducedTable: dict, EventsTable: dict,
         dic_re = ReducedTable[dur]['BCName'][selected_BCN]
         dic_ex = EventsTable[dur]['BCName'][selected_BCN]
         keys =  list(dic_re.keys())
-        sub_keys = [keys[0], keys[200]]
+        n_keys = len(keys)
+        sub_keys = [keys[0], keys[n_keys-1]]
         events = []
         c = ['green', 'blue']
         for j, k in enumerate(sub_keys):
@@ -1486,6 +1520,37 @@ def plot_amount_vs_weight(weights_dic: dict,
     ax.set_title('Excess Rainfall Amount Versus Event Weight ({} Events)'.format(n))
     ax.grid()
     ax.legend()    
+
+
+def plot_cum_precip_or_excess(df: pd.DataFrame, var: str='Precip') -> None:
+    '''Plot the cumulative rainfall or excess rainfall verses time.
+    '''
+    assert var == 'Precip' or var == 'Excess'
+    if var == 'Precip': 
+        name = 'Precipitation'
+    elif var == 'Excess':
+        name = 'Excess Rainfall'
+    fig, ax = plt.subplots(figsize = (24, 5))
+    for col in df.columns:
+        ax.plot(df[col]) 
+    nevents = df.shape[1]
+    ax.set_title('{0} {1} Events'.format(nevents, name), fontsize=18)
+    ax.set_xlabel('Time (hours)', fontsize = 18)
+    ax.set_ylabel('Cumulative {} (inches)'.format(var), fontsize=18)
+    ax.grid()    
+
+
+def plot_incr_excess(df: pd.DataFrame) -> None:
+    '''Plot the incremental excess rainfall verses time.
+    '''
+    fig, ax = plt.subplots(figsize = (24, 5))
+    for col in df.columns:
+        ax.plot(df[col]) 
+    nevents = df.shape[1]
+    ax.set_title('{0} Excess Rainfall Events'.format(nevents), fontsize=18)
+    ax.set_xlabel('Time (hours)', fontsize = 18)
+    ax.set_ylabel('Incremental Excess (inches)', fontsize=18)
+    ax.grid()
 
 
 #---------------------------------------------------------------------------#
