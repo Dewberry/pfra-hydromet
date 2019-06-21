@@ -10,6 +10,31 @@ def main(md: dict, dur: str, name: str, CN: int, arc_data: dict, AOI: str,
        numbers, performs the excess rainfall calculation, groups the events,
        saves the grouped incremental excess rainfall and metadata, and plots
        the results.
+
+       Parameters
+       ----------
+       md: metadata dictionary which contains the metadata for the 
+           precipitation events that were generated in EventsTable.ipynb.
+       dur: the event duration as a string, i.e 'H06', 'H12', etc.
+       name: the boundary condition name as a string.
+       CN: the user-specified curve number as an integer.
+       arc_data: a dictionary containing the AMCI and AMCIII values for the
+                 specified curve number.
+       AOI: Name of the area of interest as a string.
+       outputs_dir: The path for saving the outputs, including intermediate
+                    and final results
+       adjust_CN_less24: Bool specifying whether to adjust the curve number
+                         when the storm duration is less than 24 hours.
+       remove_intermediates: Bool specifying whether to remove the 
+                             intermediate randomized data files once they 
+                             have been added to the final metadata file.
+       display_print: Bool specifying whether to display print statements.
+       plot: Bool specifying whether to display plots.
+   
+       Returns
+       -------
+       outfiles: A list of the path/filenames saved.
+
     '''
     outfiles = []
     idur = int(dur.replace('H', ''))

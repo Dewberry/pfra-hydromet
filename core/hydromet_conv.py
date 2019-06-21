@@ -10,7 +10,32 @@ def main(binData: list, incr_excess: pd.DataFrame, tempE: float,
        volumentric differences between two curves. The mean of each group of
        curves is calculated and used in place of the original set of curves
        in order to improve modeling efficiency by reducing redundancy.
-    '''
+
+       Parameters
+       ----------
+ 	   binData: a list of excess rainfall amounts which represent the bounds 
+ 	            of the binned excess rainfall events.
+ 	   incr_excess: a dataframe containing the incremental excess rainfall 
+ 	                for a suite of randomly generated events.
+ 	   tempE: The number of hours over which to resample the excess rainfall 
+ 	          event timestep as a float. 
+ 	   convE:The maximum allowable percent difference in excess rainfall 
+ 	         between two curves at any timestep as a float.
+ 	   volE: The maximum allowable precent difference in the total excess 
+ 	         rainfall between two curves as a float
+ 	   tsthresh: The convolution test statistic threshold as a float. If a 
+ 	             test statistic is above this threshold then two curves are
+ 	             considered to be quantitatively similiar and are grouped.
+ 	   display_print: Bool specifying whether to display print statements.
+   
+       Returns
+       -------
+       results: A dictionary containing the final and mid-bin incremental
+                excess events as dataframes, the resampled mid-bin incremental
+                excess events as a dataframe, and the final and mid-bin group 
+                IDs as dictionaries. 
+
+    '''   
     penult_curves = pd.DataFrame()
     penult_groups = {}
     penult_tests = {} 

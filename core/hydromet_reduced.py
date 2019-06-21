@@ -8,7 +8,31 @@ def main(EventsTable: dict, durations: list, BCN: list,
                                         display_print: bool=True) -> list:
     '''Calculates the reduced excess rainfall for each event within the 
        EventsTable dictionary. 
-    '''
+        
+       Parameters
+       ----------
+       Eventstable: A dictionary containing the incremental excess rainfall 
+                    for a suite of randomly generated events.
+       durations: A list of event durations, i.e ['H06', 'H12', ...]
+       BCN: A list of boundary condition names, i.e. ['D01', 'D02', ...]
+       rand_rate_cap: Bool indicating whether to randomly select the stormwater
+                      removal rate and capacity or whether to use the 
+                      user-specified values. 
+       rate: Stormwater removal rate as a float.
+       maxcap: Maximum stormwater system capacity as a float.
+       minrate: The minimum stormwater removal rate as a float. This is used
+                 when rand_rate_cap is set to 'True'.
+       maxrate: The maximum stormwater removal rate as a float. This is used
+                when rand_rate_cap is set to 'True'.
+       seed: The random number generator seed as an integer.
+       display_print: Bool specifying whether to display print statements.
+   
+       Returns
+       -------
+       results: A list of dictionaries, which included the incremental reduced
+                excess rainfall for each event, the incremental stormwater 
+                amount for each event, and the metadata.
+    '''  
     RTab = {}
     STab = {}
     SW_variables = {}
