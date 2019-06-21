@@ -1560,7 +1560,7 @@ def plot_convEpsilon(events: pd.DataFrame, e1: str,
     												+resampled[e2])/2.0)*100.0
     max_perc_dif = perc_dif.max() 
     st1 = (convEpsilon-max_perc_dif)/convEpsilon
-    if verbose: display(Markdown('$t_c:$')); print(st1)
+    if verbose: display(Markdown('<i>t<sub>c</sub></i>')); print(st1)
     tstep = events.index[-1]/(events.shape[0]-1)
     idx=np.arange(0,duration+adj_tempEpsilon*tstep,adj_tempEpsilon*tstep)
     fig, ax = plt.subplots(1, 2, figsize = (24, 5))
@@ -1604,7 +1604,7 @@ def plot_volEpsilon(events: pd.DataFrame, e1: str, e2: str, duration: int,
     perc_dif = list(abs(cum_e1-cum_e2)/((cum_e1+cum_e2)/2.0)*100)
     perc_dif_total = perc_dif[-1]
     st2 = (volEpsilon-perc_dif_total)/volEpsilon
-    if verbose: display(Markdown('$t_v:$')); print(st2)
+    if verbose: display(Markdown('<i>t<sub>v</sub></i>')); print(st2)
     fig, ax = plt.subplots(1, 2, figsize = (24, 5))
     ax[0].plot(idx, np.insert(list(cum_e1), 0, 0), label = e1)
     ax[0].plot(idx, np.insert(list(cum_e2), 0, 0), label = e2) 
