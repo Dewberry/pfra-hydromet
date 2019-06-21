@@ -1,6 +1,7 @@
 import os
 import io
 import re
+import csv
 import json
 import time
 import urllib
@@ -8,13 +9,14 @@ import shutil
 import logging
 import operator
 import warnings
-warnings.filterwarnings('ignore')
 import pathlib as pl
 import papermill as pm
 import scrapbook as sb
 from zipfile import ZipFile
 from datetime import datetime
 from collections import Counter
+logging.basicConfig(level=logging.ERROR)
+from IPython.display import display, Markdown
 
 import numpy as np
 import pandas as pd
@@ -381,7 +383,7 @@ def find_optimal_curve_beta_dist_S(df: pd.DataFrame, alpha: float=2.0,
 
 
 def RandomizeData(df: pd.DataFrame, number: int, outputs_dir: str, 
-  filename: str, dur: int, seed: int=None, variable: str='Precipitation',
+  filename: str, dur: int=24, seed: int=None, variable: str='Precipitation',
                    plot: bool=False, display_print: bool=True) -> pd.DataFrame:
     '''Randomly selects a precipitation amount from the log-normal 
        distribution given the expected value and optimized standard devation 
@@ -534,20 +536,53 @@ def populate_event_precip_data(random_cns: pd.DataFrame,
         t_curve=curve_group['q{}'.format(int(orig_q))]['{}%'.format(decile)]
         rand_rain = t_curve*precip/100
         if dur < 24 and adjust_CN_less24:
-            adj_CN, adj_s, adj_ia = update_CN(cn, dur, precip)
-            excess = rand_rain.apply(calculate_excess, args=(adj_ia, adj_s))
+            adj_CN, s, ia = update_CN(cn, dur, precip)
         else:
             s  = S_24hr(cn)
             ia = IA_24hr(s)
-            excess = rand_rain.apply(calculate_excess, args=(ia, s))
+        excess = rand_rain.apply(calculate_excess, args=(ia, s))
         runid='E{}_'.format(event)+'{}Hr_'.format(dur)+'Q{}_'.format(int(orig_q))+'D{}_'.format(decile)+'CN{}'.format(cn)
         sim_ID = 'E{}'.format(simID) 
         events_log[sim_ID] = runid 
         output_precip_data[sim_ID] = rand_rain
         cum_excess[sim_ID] = excess
-        corrected_incremental = adjust_incremental(rand_rain, excess)
-        incr_excess[sim_ID] = corrected_incremental
+        incr_excess[sim_ID] = adjust_incremental(rand_rain, excess)
     return output_precip_data, cum_excess, incr_excess, events_log
+
+
+def calc_excess_rainfall(eventID: dict, precip: dict, 
+                                        random_cns: pd.DataFrame, idur: int,  
+                                    adjust_CN_less24: bool=False) -> list:
+    '''Calculates cumulative and incremental runoff for each event using a 
+       randomly selected precipitation amount, quartile specific temporal 
+       distribution, and curve number. This function performs the same 
+       calculations as populate_event_precip_data but is employed by 
+       the distalEventsTable.ipynb.
+    '''
+    count = 0
+    for k, v in eventID.items():
+        if count == 0:
+            idx = [float(i) for i in list(precip[v].keys())]
+            final_precip = pd.DataFrame(index = idx)
+            cum_excess = pd.DataFrame(index = idx)
+            incr_excess = pd.DataFrame(index = idx)
+            count+=1
+        excess = []
+        cum_precip = list(precip[v].values())
+        total_precip = cum_precip[-1]
+        cn = random_cns.loc[int(k)]['Random CN']
+        if idur < 24 and adjust_CN_less24:
+            adj_cn, s, ia = update_CN(cn, idur, total_precip)
+        else:
+            s  = S_24hr(cn)
+            ia = IA_24hr(s)
+        for p in cum_precip:
+            excess.append(calculate_excess(p, ia, s))
+        cum_excess[v] = excess
+        final_precip[v] = cum_precip
+        incr_excess[v] = adjust_incremental(final_precip[v], cum_excess[v])
+    results = [cum_excess, final_precip, incr_excess] 
+    return results
 
 
 def update_CN(CN: int, duration: int, 
@@ -657,7 +692,15 @@ def convert_tempEpsilon(tempEpsilon: float, incr_excess: pd.DataFrame) -> int:
        corresponding timesteps.
     '''
     tstep = incr_excess.index[-1]/(incr_excess.shape[0]-1)
-    adj_tempEpsilon = int(tempEpsilon/tstep)
+    adj_tempEpsilon = tempEpsilon/tstep
+    if adj_tempEpsilon<1:
+        warnings.warn("tempEpsilon less than the number of hours in a "
+                            "timestep, adj_tempEpsilon set to 1 timestep")
+        adj_tempEpsilon = 1
+    elif not (adj_tempEpsilon).is_integer():
+        warnings.warn("Number of timesteps not an integer, adj_tempEpsilon" 
+                                    "rounded down to the closest integer")   
+    adj_tempEpsilon = int(adj_tempEpsilon)
     return adj_tempEpsilon
 
 
@@ -701,7 +744,7 @@ def prep_data_for_convolution(dataslice: pd.DataFrame,
         curve_result = test_shapes(dataslice, col, adj_tempEpsilon) 
         curve_test_dict[col] = curve_result
     curve_test_df = pd.DataFrame.from_dict(curve_test_dict, orient='index').T
-    curve_test_df_nanzero=curve_test_df.fillna(0)
+    curve_test_df_nanzero = curve_test_df.fillna(0)
     return curve_test_df_nanzero
 
 
@@ -729,7 +772,7 @@ def conv_ts(curve_test_df: pd.DataFrame,
        Note that in this function's code, "c" and "nc" refer to "column" 
        and "next column", respectively.
     '''
-    df=curve_test_df.copy()
+    df = curve_test_df.copy()
     test_dic = {}
     test_values = []
     for i, c in enumerate(df.columns):
@@ -791,9 +834,9 @@ def calc_mean_curves(curve_group: dict,
     updated_curves = {}
     for k, v in curve_group.items():
         v_lst = extract_list(v)
-        like_slice = dataslice[v_lst] 
+        like_slice =  dataslice[v_lst] 
         mean_curve = like_slice.mean(axis=1)
-        updated_curves[k]=mean_curve
+        updated_curves[k] = mean_curve
     df_updated_curves = pd.DataFrame.from_dict(updated_curves)    
     return df_updated_curves
 
@@ -913,6 +956,16 @@ def dic_to_list(dic: dict, get_set: bool=False) -> list:
     return single_lst
 
 
+def adj_duration_weight(dur_weight: float, lower_limit: int, 
+                                        display_print: bool=True) -> float:
+    '''Adjust the duration weight by the lower recurrance interval since 
+       the events themseleves are truncated by this lower value.
+    '''
+    adj_dur_weight = dur_weight*1.0/lower_limit
+    if display_print: print(adj_dur_weight)
+    return adj_dur_weight
+
+
 def Calc_Group_Weight(final_groups: dict, duration_weight: float,
                                         display_print: bool = True) -> dict:
     '''Calculates the weight of each group of curves, such that the sum of 
@@ -996,7 +1049,11 @@ def excess_df_to_input(outputs_dir: str, df: pd.DataFrame, tstep: float,
             m_dtm = start_date
             event_data = df[col]
             for j, idx in enumerate(event_data.index):
-                if j > 0: m_dtm+=pd.Timedelta(hours = tstep)
+                if j > 0: 
+                    if tstep_units == 'MIN': 
+                        m_dtm+=pd.Timedelta(minutes = tstep)
+                    elif tstep_units == 'HOUR': 
+                        m_dtm+=pd.Timedelta(hours = tstep)
                 htime_string = datetime.strftime(m_dtm, '%d%b%Y %H%M')
                 runoff = event_data.loc[idx]
                 f.write('"{}"'.format(scen_name)+' '+col+' '+htime_string+' '+str(runoff)+'\n')
@@ -1072,12 +1129,69 @@ def extract_event_metadata(outfiles: list, events_metadata: dict,
     return metadata
 
 
-def combine_excess_rainfall(var: str, outputs_dir: str, AOI: str, 
+def determine_timestep(dic_dur: dict, display_print: bool=True) -> float:
+    '''Calculates the timestep of the rainfall excess data contained within
+       the passed dictionary.
+    '''
+    time_ord = dic_dur['time_idx_ordinate']
+    assert time_ord == 'Hours', 'Timestep is not in units of hours'
+    time_idx = dic_dur['time_idx']
+    timestep = float(time_idx[-1])/(len(time_idx)-1)
+    if display_print: print('Time Step: {0} {1}'.format(timestep, time_ord))
+    return timestep
+
+
+def storm_water_simulator(minrate30: float, maxrate30: float, ts: float, 
+                        seed: int=None, display_print: bool=True) -> list:
+    '''Randomly selects a stormwater removal rate between the minimum and
+       maximum values and then calculates the maximum stormwater capacity.
+    '''
+    if not seed:
+        seed = np.random.randint(low=0, high=10000)
+    np.random.seed(seed)
+    adj_rate = np.random.uniform(minrate30, maxrate30)   
+    maximum_capacity = adj_rate*(24.0/ts)
+    results = [adj_rate, maximum_capacity, seed]
+    if display_print: 
+        print('Rate:', adj_rate, 'Maximum Capacity:', maximum_capacity, 'Seed:', seed)
+    return results 
+
+
+def reduced_excess(event: list, adj_rate: float, max_capacity: float) -> list:
+    '''Calculates the reduced excess rainfall for the passed event using the
+       adjusted stormwater removal rate and the maximum stormwater capacity.
+    '''
+    reduced_event = event.copy()
+    remaining_cap = max_capacity
+    for i, val in enumerate(event):
+        if remaining_cap > 0: 
+            remainder = val - adj_rate
+            if remainder <= 0.0: 
+                remainder = 0.0
+                remaining_cap -= val
+            if remainder > 0.0:
+                remaining_cap -= adj_rate   
+            if remaining_cap >=0.0:
+                reduced_event[i] = remainder
+            if remaining_cap < 0.0:
+                reduced_event[i] = (remainder-remaining_cap)
+                remaining_cap = 0.0
+                continue
+        elif remaining_cap <=0:
+            reduced_event[i] = val  
+    int_total = np.round(sum(event), 5)
+    f_total = np.round(sum(reduced_event)+max_capacity-remaining_cap, 5) 
+    assert int_total == f_total, 'Check reduced runoff calculation, mass not conserved'
+    return reduced_event
+
+
+def combine_results(var: str, outputs_dir: str, AOI: str, 
             durations: list, tempEpsilon_dic: dict, convEpsilon_dic: dict, 
-                volEpsilon_dic: dict, remove_ind_dur: bool = True) -> dict:
+    volEpsilon_dic: dict, BCN: str=None, remove_ind_dur: bool = True) -> dict:
     '''Combines the excess rainfall *.csv files for each duration into a 
        single dictionary for all durations.
     '''
+    assert var in ['Excess_Rainfall', 'Weights'], 'Cannot combine results'
     dic = {}
     df_lst = []
     for dur in durations:
@@ -1086,28 +1200,109 @@ def combine_excess_rainfall(var: str, outputs_dir: str, AOI: str,
         vE = volEpsilon_dic[str(dur)]
         scen='{0}_Dur{1}_tempE{2}_convE{3}_volE{4}'.format(AOI, dur, tE, cE, vE)
         file = outputs_dir/'{}_{}.csv'.format(var, scen)
-        df = pd.read_csv(file)
-        if remove_ind_dur:
-            os.remove(file)
+        df = pd.read_csv(file, index_col = 0)
         if var == 'Excess_Rainfall':
             df_dic = df.to_dict()
-            dates = list(df_dic['hours'].values())
+            dates = list(df.index)
+            ordin = df.index.name.title()
             events = {}
             for k, v in df_dic.items():
                 if 'E' in k:
                     events[k] = list(v.values())
-            dic[str(dur)] = {'dates': dates, 'events': events}
+            key ='H{0}'.format(str(dur).zfill(2))
+            val = {'time_idx_ordinate': ordin, 'time_idx': dates, 'BCName': {BCN: events}}         
+            dic[key] = val
         elif var == 'Weights':
             df_lst.append(df)
+        if remove_ind_dur:
+            os.remove(file)    
     if var == 'Weights':
         all_dfs = pd.concat(df_lst)
-        all_dfs = all_dfs.set_index('Unnamed: 0')
-        all_dfs.index.name = ''
+        weights_dic = all_dfs.to_dict()
+        dic = {'BCName': {BCN: weights_dic['Weight']}}
         print('Total Weight:', all_dfs['Weight'].sum())
-        dic = all_dfs.to_dict()
+    return dic
+    
+
+def combine_metadata(outputs_dir: str, AOI: str, durations: list, 
+        tempEpsilon_dic: dict, convEpsilon_dic: dict, volEpsilon_dic: dict, 
+                            BCN: str, remove_ind_dur: bool = True) -> dict:
+    '''Combines the metadata files for each duration into a single file for
+       all durations.
+    '''
+    dic = {}
+    for dur in durations:
+        tE = tempEpsilon_dic[str(dur)]
+        cE = convEpsilon_dic[str(dur)]
+        vE = volEpsilon_dic[str(dur)]
+        scen='{0}_Dur{1}_tempE{2}_convE{3}_volE{4}'.format(AOI, dur, tE, cE, vE)
+        file = outputs_dir/'Metadata_{0}.json'.format(scen)  
+        with open(file) as f:
+            md =  json.load(f)
+        key = 'H{0}'.format(str(dur).zfill(2))
+        val = {'BCName': {BCN: md}}
+        dic[key] = val
+        if remove_ind_dur:
+            os.remove(file)
+    return dic   
+    
+
+def combine_distal_results(outfiles: list, var: str, BCN: list, 
+                        ordin: str='Hours', remove_ind_dur: bool=True) -> dict:
+    '''Combines the excess rainfall results and metadata for each duration 
+       into a single file for all durations.
+    '''
+    assert len(BCN)==1, 'Update function to handle multiple boundary conditions'
+    dic = {}
+    for file in outfiles:
+        if var=='Excess' and 'Excess' in str(file):
+            dur = int(str(file).split('_')[4].replace('Dur', ''))
+            df = pd.read_csv(file, index_col = 0)
+            df_dic = df.to_dict()
+            dates = list(df.index)
+            events = {}
+            for k, v in df_dic.items():
+                if 'E' in k:
+                    events[k] = list(v.values())
+            val = {'time_idx_ordinate': ordin, 'time_idx': dates, 'BCName': {BCN[0]: events}}  
+        elif var=='Metadata' and 'Metadata' in str(file):
+            dur = int(str(file).split('_')[3].replace('Dur', ''))
+            with open(file) as f:
+                md =  json.load(f)
+            val = {'BCName': {BCN[0]: md}}
+        else:
+            continue        
+        key ='H{0}'.format(str(dur).zfill(2))
+        dic[key] = val
+        if remove_ind_dur:
+             os.remove(file)
     return dic
 
-    
+
+def dict_to_df(dic: dict, display_head: bool=True) -> pd.DataFrame:
+    '''Convert a dictionary of lists of non-equal length or individual
+       floats/integers to a dataframe.
+    '''
+    count = 1
+    for k, v in dic.items():
+        if count==1:
+            df = pd.DataFrame()
+            if type(v)==int or type(v)==float:
+                df[k] = [v]
+            else:
+                df[k] = v
+            count+=1
+        else:
+            df1 = pd.DataFrame()
+            if type(v)==int or type(v)==float:
+                df1[k] = [v]
+            else:
+                df1[k] = v
+            df = df.join(df1)
+    if display_head: print(display(df.head()))    
+    return df
+
+
 #---------------------------------------------------------------------------#
 # Plotting Functions
 #---------------------------------------------------------------------------#
@@ -1276,6 +1471,210 @@ def plot_grouped_curves(final_curves: dict, y_max: float,
     if iplot:
         plt.close(fig)
     return fig
+
+
+def plot_reduced_excess(ReducedTable: dict, EventsTable: dict, 
+                        durations: list, selected_BCN: str) -> plt.subplot:
+    '''Plot the excess rainfall and reduced excess rainfall for the first two
+       events of each duration within the passed dictionaries.
+    '''
+    n = len(durations)
+    fig, ax = plt.subplots(n, 1, figsize=(18,18))
+    fig.suptitle('Excess Rainfall Reduction by Duration', size = 16)
+    for i, dur in enumerate(durations):
+        idx = ReducedTable[dur]['time_idx']
+        units = ReducedTable[dur]['time_idx_ordinate']
+        dic_re = ReducedTable[dur]['BCName'][selected_BCN]
+        dic_ex = EventsTable[dur]['BCName'][selected_BCN]
+        keys =  list(dic_re.keys())
+        n_keys = len(keys)
+        sub_keys = [keys[0], keys[n_keys-1]]
+        events = []
+        c = ['green', 'blue']
+        for j, k in enumerate(sub_keys):
+            ax[i].plot(idx, dic_ex[k], linestyle = '-', label=k, color=c[j])        
+            ax[i].plot(idx,dic_re[k],linestyle='--',label=f'{k} (Reduced)',color=c[j])   
+        ax[i].set_xlabel('Time, [{}]'.format(units))
+        ax[i].set_ylabel('Excess Rainfall, [inches]')
+        ax[i].grid()
+        ax[i].legend()
+    fig.tight_layout()
+    fig.subplots_adjust(top=0.96)
+
+
+def plot_amount_vs_weight(weights_dic: dict, 
+                                excess_dic: dict, BCN: str) -> plt.subplots:
+    '''Plot the total excess rainfall for each event versus its weight.
+    '''
+    fig, ax = plt.subplots(1,1, figsize=(24,5))
+    n = 0
+    for dur in excess_dic.keys():
+        weight = []
+        runoff = []
+        for k in excess_dic[dur]['BCName'][BCN].keys():
+            n+=1
+            runoff.append(sum(excess_dic[dur]['BCName'][BCN][k]))
+            weight.append(weights_dic['BCName'][BCN][k])
+        ax.plot(weight, runoff, linestyle = '', marker = '.', label = dur)
+    ax.set_xlabel('Event Weight, [-]')
+    ax.set_ylabel('Excess Rainfall, [inches]')
+    ax.set_title('Excess Rainfall Amount Versus Event Weight ({} Events)'.format(n))
+    ax.grid()
+    ax.legend()    
+
+
+def plot_tempEpsilons(events: pd.DataFrame, event_of_interest: str, 
+				tempEpsilons: list, duration: int, verbose: bool=True) -> None:
+    '''Plot the incremental excess rainfall curve for each tempEpsilon. 
+    '''
+    fig, ax = plt.subplots(figsize=(24, 5))
+    ax.plot(events.index, events[event_of_interest], color='black',
+    										 linewidth='1', label='Original') 
+    for e in tempEpsilons:
+        adj_tempEpsilon = convert_tempEpsilon(e, events)
+        if verbose: print('{0} hours is {1} '
+        							'timesteps'.format(e, adj_tempEpsilon))
+        tstep = events.index[-1]/(events.shape[0]-1)
+        events_resampled = prep_data_for_convolution(events, adj_tempEpsilon)
+        idx=np.arange(0,duration+adj_tempEpsilon*tstep,adj_tempEpsilon*tstep)
+        ax.plot(idx, np.insert(list(events_resampled.iloc[:,0]), 0, 0),
+        		linewidth='1', label='tempEpsilon = {}'.format(e), alpha=0.75)
+    ax.grid()
+    ax.set_xlabel('Duration, [hours]')
+    ax.set_ylabel('Incremental Excess, [inches/timestep]')
+    ax.set_title('Excess Rainfall', size = 18)
+    ax.legend(prop={'size': 9}) 
+
+
+def plot_convEpsilon(events: pd.DataFrame, e1: str,
+				e2: str, duration: int, tempEpsilon: float, 
+							convEpsilon: float, verbose: bool=True) -> float:
+    '''Calculates the percent difference between the two curves at each 
+       timestep, the maximum percent difference, and the summary statistic 
+       (st1), and then plots the excess rainfall events and their percent 
+       differences relative to convEpsilon.
+    '''
+    adj_tempEpsilon = convert_tempEpsilon(tempEpsilon, events)
+    resampled = prep_data_for_convolution(events, adj_tempEpsilon)
+    perc_dif = abs(resampled[e1]-resampled[e2])/((resampled[e1]
+    												+resampled[e2])/2.0)*100.0
+    max_perc_dif = perc_dif.max() 
+    st1 = (convEpsilon-max_perc_dif)/convEpsilon
+    if verbose: display(Markdown('<i>t<sub>c</sub></i>')); print(st1)
+    tstep = events.index[-1]/(events.shape[0]-1)
+    idx=np.arange(0,duration+adj_tempEpsilon*tstep,adj_tempEpsilon*tstep)
+    fig, ax = plt.subplots(1, 2, figsize = (24, 5))
+    ax[0].plot(idx, np.insert(list(resampled[e1]), 0, 0), label = e1)
+    ax[0].plot(idx, np.insert(list(resampled[e2]), 0, 0), label = e2) 
+    ax[0].set_title('Excess Rainfall Events', fontsize=18)
+    ax[0].set_xlabel('Time, [hours]', fontsize = 18)
+    ax[0].set_ylabel('Incremental Excess, [inches]', fontsize=18)
+    ax[0].grid()
+    ax[0].legend(prop={'size': 9})
+    ax[1].plot(idx, np.insert(list(perc_dif), 0, 0), color = 'black',
+    														 label = '% Dif')
+    ax[1].plot(idx[perc_dif.idxmax()+1], max_perc_dif, linestyle = '', 
+    						marker = '.', markersize = 12, color = 'orange',
+    	 		label = 'Max % Dif = {}'.format(np.round(max_perc_dif, 2)))
+    ax[1].plot(idx, np.ones(len(idx))*convEpsilon, color = 'red', 
+    						label = 'convEpsilon = {0}'.format(convEpsilon))
+    ax[1].set_title('Percent Difference between {0} and '
+    										'{1}'.format(e1, e2), fontsize=18)
+    ax[1].set_xlabel('Time, [hours]', fontsize = 18)
+    ax[1].set_ylabel('% Dif, [-]', fontsize=18)
+    ax[1].grid()
+    ax[1].legend(prop={'size': 9}) 
+    return st1
+
+
+def plot_volEpsilon(events: pd.DataFrame, e1: str, e2: str, duration: int, 
+		tempEpsilon: float, volEpsilon: float, verbose: bool=True) -> float:
+    '''Calculates the cumulative curves for the two events, the percent 
+       difference at each timestep, the total percent difference (percent 
+       difference at the final timestep), and the summary statistic (st2), 
+       and then plots the cumulative excess rainfall events and their percent
+       differences relative to volEpsilon.
+    '''
+    adj_tempEpsilon = convert_tempEpsilon(tempEpsilon, events)
+    events_resampled = prep_data_for_convolution(events, adj_tempEpsilon)
+    tstep = events.index[-1]/(events.shape[0]-1)
+    idx = np.arange(0, duration+adj_tempEpsilon*tstep, adj_tempEpsilon*tstep)
+    cum_e1 = events_resampled[e1].cumsum()
+    cum_e2 = events_resampled[e2].cumsum()
+    perc_dif = list(abs(cum_e1-cum_e2)/((cum_e1+cum_e2)/2.0)*100)
+    perc_dif_total = perc_dif[-1]
+    st2 = (volEpsilon-perc_dif_total)/volEpsilon
+    if verbose: display(Markdown('<i>t<sub>v</sub></i>')); print(st2)
+    fig, ax = plt.subplots(1, 2, figsize = (24, 5))
+    ax[0].plot(idx, np.insert(list(cum_e1), 0, 0), label = e1)
+    ax[0].plot(idx, np.insert(list(cum_e2), 0, 0), label = e2) 
+    ax[0].set_title('Excess Rainfall Events', fontsize=18)
+    ax[0].set_xlabel('Time, [hours]', fontsize = 18)
+    ax[0].set_ylabel('Cumulative Excess, [inches]', fontsize=18)
+    ax[0].grid()
+    ax[0].legend(prop={'size': 9}) 
+    ax[1].plot(idx, np.insert(perc_dif, 0, 0), color = 'black', 
+    												label = 'Total % Dif')
+    ax[1].plot(idx[-1], perc_dif_total, linestyle = '', marker = '.', 
+    										markersize = 12, color = 'orange', 
+    		label = 'Total % Dif = {}'.format(np.round(perc_dif_total, 2)))
+    ax[1].plot(idx[-1], volEpsilon, linestyle = '', marker = '_', 
+    										markersize = 12, color = 'red', 
+    							label = 'volEpsilon = {0}'.format(volEpsilon))
+    ax[1].set_ylabel('% Dif, [-]', fontsize=18)
+    ax[1].set_xlabel('Time, [hours]', fontsize = 18)
+    ax[1].set_title('Percent Difference between {0} and '
+    										'{1}'.format(e1, e2), fontsize=18)
+    ax[1].grid()
+    ax[1].legend(prop={'size': 9}) 
+    return st2
+
+
+def plot_test_statistic(delta: int=0.05, vmin: float=-1.0, vmax: float=1.0) -> None:
+    '''Plot a heat map of the test statistic as a funtion of the individual 
+       summary statistics (t_c and t_v)
+    '''
+    tv, tc = np.mgrid[slice(0, 1 + delta, delta), 
+                      slice(0, 1 + delta, delta)]
+    t = 1 - np.sqrt((tc-1)**2+(tv-1)**2)
+    fig, ax = plt.subplots(figsize = (9,6))
+    c = ax.pcolormesh(tc, tv, t, cmap='RdBu', vmin=vmin, vmax=vmax)
+    ax.set_xlabel('$t_c$', fontsize = 14)
+    ax.set_ylabel('$t_v$', fontsize = 14)
+    ax.set_title('Test Statistic as a Function of $t_c$ and '
+    													'$t_v$', fontsize=18)
+    fig.colorbar(c)
+
+
+def plot_cum_precip_or_excess(df: pd.DataFrame, var: str='Precip') -> None:
+    '''Plot the cumulative rainfall or excess rainfall verses time.
+    '''
+    assert var == 'Precip' or var == 'Excess'
+    if var == 'Precip': 
+        name = 'Precipitation'
+    elif var == 'Excess':
+        name = 'Excess Rainfall'
+    fig, ax = plt.subplots(figsize = (24, 5))
+    for col in df.columns:
+        ax.plot(df[col]) 
+    nevents = df.shape[1]
+    ax.set_title('{0} {1} Events'.format(nevents, name), fontsize=18)
+    ax.set_xlabel('Time (hours)', fontsize = 18)
+    ax.set_ylabel('Cumulative {} (inches)'.format(var), fontsize=18)
+    ax.grid()    
+
+
+def plot_incr_excess(df: pd.DataFrame) -> None:
+    '''Plot the incremental excess rainfall verses time.
+    '''
+    fig, ax = plt.subplots(figsize = (24, 5))
+    for col in df.columns:
+        ax.plot(df[col]) 
+    nevents = df.shape[1]
+    ax.set_title('{0} Excess Rainfall Events'.format(nevents), fontsize=18)
+    ax.set_xlabel('Time (hours)', fontsize = 18)
+    ax.set_ylabel('Incremental Excess (inches)', fontsize=18)
+    ax.grid()
 
 
 #---------------------------------------------------------------------------#

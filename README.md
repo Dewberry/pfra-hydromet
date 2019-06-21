@@ -12,13 +12,9 @@ for input to hydraulic models using:
   3. Random sampling
   4. Convolution algorithm for  grouping
 
-These tools ([jupyter notebooks](https://jupyter.org/) ) ingest data from the NOAA Hydrometeorological Design Studies Center ([HDSC](https://www.nws.noaa.gov/oh/hdsc/index.html)) and return unique, weighted runoff events suitable for use in 2D hydraulic *rain-on-grid* models. Executed notebooks should
-be saved as documentation of the inputs, outputs, and results for a given project location.
+These tools ([jupyter notebooks](https://jupyter.org/) ) ingest data from the NOAA Hydrometeorological Design Studies Center ([HDSC](https://www.nws.noaa.gov/oh/hdsc/index.html)) and return unique, weighted runoff events suitable for use in 2D hydraulic *rain-on-grid* models. Executed notebooks should be saved as documentation of the inputs, outputs, and results for a given project location.
 
-__NOTE__: [EventsTable](EventsTable.ipynb) is currently the primary notebook for developing
-excess precipitation scenarios, and is managed and called by [*Papermill*](https://pypi.org/project/papermill/).
-Within this repo, papermill is designed to act as a *manager* to maintain consistency in computation,
-and ensure cells are executed in order. *Manager* notebooks are designated with the `PM-` prefix.
+__NOTE__: [EventsTable](EventsTable.ipynb) is currently the primary notebook for developing excess precipitation scenarios, and is managed and called by [*Papermill*](https://pypi.org/project/papermill/). Within this repo, papermill is designed to act as a *manager* to maintain consistency in computation, and ensure cells are executed in order. *Manager* notebooks are designated with the `PM-` prefix.
 
 
 ## Contents
@@ -27,32 +23,35 @@ and ensure cells are executed in order. *Manager* notebooks are designated with 
 
 ##### Notebooks
 
-1. [__PrecipTable__](PrecipTable.ipynb): Retrieve NOAA Atlas 14 precipitation statisics
-at an Area of Interest (AOI).
+1. [__PrecipTable__](PrecipTable.ipynb): Retrieve NOAA Atlas 14 precipitation statisics at an Area of Interest (AOI).
 
-2. [__PM-EventsTable__](PM-EventsTable.ipynb): Manager notebook that executes `EventsTable` and executes.
+2. [__PM-EventsTable__](PM-EventsTable.ipynb): Manager notebook that executes `EventsTable` and/or `reEventsTable`.
 
-3. [__EventsTable__](EventsTable.ipynb): Calculates excess rainfall using the NOAA Atlas 14 mean precipitation data, temporal distributions, and the curve number (CN)* transform. The output is a set of unique, weighted
-excess precipitation time series.
+3. [__EventsTable__](EventsTable.ipynb): Calculates excess rainfall using the NOAA Atlas 14 mean precipitation data, temporal distributions, and the curve number (CN)* transform. The output is a set of unique, weighted excess precipitation time series.
+
+4. [__reEventsTable__](reEventsTable.ipynb): Calculates the reduced excess rainfall given a user-specified stormwater removal rate and capacity. 
+
+5. [__distalEventsTable__](distalEventsTable.ipynb): Calculates excess rainfall using updated randomized curve numbers and the original precipitation events calculated in `EventsTable.ipynb`. The events are combined using the groups determined from the convolution steps in `EventsTable.ipynb`. The `reEventsTable` notebook can be then be executed in order to calculate the reduced excess rainfall.
+
+6. [__MetadataExplorer__](MetadataExplorer.ipynb): Explores the metadata file created by `PM-EventsTable` or `distalEventsTable` during the excess rainfall calculations.
+
+
+7. [__Convolution_Parameters__](Convolution_Parameters.ipynb): Describes the test statistic and parameters used during the convolution step in the `EventsTable` notebook.
+
 
 ##### DataRepository
 
  - __Temporal datasets__ (csv): Temporal distributions of observed rainfall patterns broken down by volume, region, duration, and quartile [NOAA Published](https://hdsc.nws.noaa.gov/hdsc/pfds/pfds_temporal.html) are saved as csv's here. Datasets here were compiled from source files into csv format for uniform formatting.
 
-- `Temporal_Distribution_Data_Map.json` Mapping data used to extract the temporal distributions from
-regional datasets to a uniform csv format.
+- `Temporal_Distribution_Data_Map.json` Mapping data used to extract the temporal distributions from regional datasets to a uniform csv format.
 
 - `Temporal_Quartile_Ranks.xlsx` contains the percentage of precipitation events whose temporal distributions are represented by those in each quartile. [Source](https://www.nws.noaa.gov/oh/hdsc/currentpf.html).
 
-- `NEH630_Table_10_1.json` is a formatted copy of table 10-1 from the National Engineering
-Handbook [Chapter 10](https://www.wcc.nrcs.usda.gov/ftpref/wntsc/H&H/NEHhydrology/ch10.pdf.) listing
-CN values over differing antecedent moisture conditions.
+- `NEH630_Table_10_1.json` is a formatted copy of table 10-1 from the National Engineering Handbook [Chapter 10](https://www.wcc.nrcs.usda.gov/ftpref/wntsc/H&H/NEHhydrology/ch10.pdf.) listing CN values over differing antecedent moisture conditions.
 
 - `NOAA_Atlas_Volume_Codes.json` maps the NOAA Atlas 14 volume number to the volume code. [Source](https://hdsc.nws.noaa.gov/hdsc/pfds/pfds_gis.html)
 
-*The ([CN Method](https://www.nrcs.usda.gov/Internet/FSE_DOCUMENTS/stelprdb1044171.pdf))
-is currently the only transform method in use for this project. Other transforms are available
-and can be adopted into the tool with minor modifications.
+*The ([CN Method](https://www.nrcs.usda.gov/Internet/FSE_DOCUMENTS/stelprdb1044171.pdf)) is currently the only transform method in use for this project. Other transforms are available and can be adopted into the tool with minor modifications.
 
 
 ## Usage
