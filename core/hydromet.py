@@ -69,7 +69,7 @@ def get_volume_code(datarepository_dir: str, vol_code_filename: str,
 	return code
 
 
-def intersect_temporal_areas(geo_df: geoDF, datarepository_dir: plib, alldata: bool = False) -> dict:
+def intersect_temporal_areas(geo_df: geoDF, datarepository_dir: plib, alldata: bool = False) -> (dict, geoDF):
 	'''Intersects the area of interest with NOAA Temporal Areas. The volume code, region code, 
 	   and percent area of the area of interest within that region is returned in a dictionary. 
 	   If alldata is set to True, the dictionary returned will contain information for all regions
@@ -102,8 +102,8 @@ def intersect_temporal_areas(geo_df: geoDF, datarepository_dir: plib, alldata: b
 				d['Region'] = intersection.loc[i, 'Region']
 				d['Percent_area'] = intersection.loc[i, 'p_area']
 	for k,v in d.items():
-		print('{:<15s}{:>1s}'.format(str(k),str(v)))
-	return OrderedDict(d)
+		print('{:<17s}{:>1s}'.format(str(k),str(v)))
+	return OrderedDict(d), intersection
 
 
 def build_precip_table(geo_df: geoDF, all_zips_list: list, noaa_url: str, 
@@ -1410,6 +1410,15 @@ def plot_area_of_interest(geo_df: geoDF, select_data: str,
 	'''
 	fig = geo_df.plot(column = column, categorical = True, figsize = (14, 18))
 	fig.set_title('Area of Interest (ID: {})'.format(select_data))
+	fig.grid()
+
+
+def plot_aoi_noaa_intersection(intersection_gdf: geoDF, select_data: str) -> plt.subplots:
+	'''Plots the intersection of the geodataframe and the NOAA Atlas Temporal Regions.
+	'''
+	intersection_gdf['Volume_Region'] = 'Volume: ' + intersection_gdf['Volume'].map(str) + ', Region: ' + intersection_gdf['Region'].map(str)
+	fig = intersection_gdf.plot(column='Volume_Region', categorical=True, figsize=(10, 14), legend=True)
+	fig.set_title('Area of Interest (ID: {}) by NOAA Atlas Region'.format(select_data))
 	fig.grid()
 
 
