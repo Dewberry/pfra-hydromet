@@ -122,7 +122,7 @@ def build_precip_table(geo_df: geoDF, all_zips_list: list, noaa_url: str,
 				open_socket = urllib.request.urlopen(remote_file)
 				get_remote_file = False
 			except:
-				if verbose: print("Unable to get data on attemt {1} for "
+				if verbose: print("Unable to get data on attempt {1} for "
 												"{0}".format(zip_name, count))
 				count+=1
 		memfile = io.BytesIO(open_socket.read())
@@ -1408,7 +1408,7 @@ def plot_area_of_interest(geo_df: geoDF, select_data: str,
 												column: str) -> plt.subplots:
 	'''Plots the column of the geodataframe with matplotlib.
 	'''
-	fig = geo_df.plot(column = column, categorical = True, figsize = (14, 18))
+	fig = geo_df.plot(column = column, categorical = True, figsize = (10, 14))
 	fig.set_title('Area of Interest (ID: {})'.format(select_data))
 	fig.grid()
 
