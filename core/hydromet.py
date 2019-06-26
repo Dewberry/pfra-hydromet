@@ -1414,8 +1414,9 @@ def plot_aoi_noaa_intersection(intersection_gdf: geoDF,
 	'''Plots the intersection of the geodataframe and the NOAA Atlas 14 
 	   volumes and regions.
 	'''
-	intersection_gdf['Volume_Region'] = 'Volume: {0}, Region {1}'.format(
-	intersection_gdf['Volume'].map(str), intersection_gdf['Region'].map(str))
+	intersection_gdf['Volume_Region'] = 'Volume: ' +\
+						intersection_gdf['Volume'].map(str) + ', Region: ' +\
+										intersection_gdf['Region'].map(str)
 	fig = intersection_gdf.plot(column='Volume_Region', categorical=True, 
 												figsize=(10, 14), legend=True)
 	fig.set_title('Area of Interest (ID: {}) by NOAA Atlas' 
@@ -1469,8 +1470,8 @@ def plot_deciles_by_quartile(curve_group: dict, qrank: list,
 	axis_num=[[0,0], [0,1], [1,0], [1,1]]
 	for i, val in enumerate(qmap['map'].keys()):
 		for col in curve_group[val].columns:
-			plt.suptitle('Volume '+str(vol)+' Region '+str(reg)+' Duration '+str(dur),
-										fontsize = 20, x  = 0.507, y = 1.02)
+			plt.suptitle('Volume '+str(vol)+' Region '+str(reg)+' Duration '+\
+								str(dur), fontsize = 20, x  = 0.507, y = 1.02)
 			ax[axis_num[i][0],axis_num[i][1]].plot(curve_group[val][col], 
 																label=col) 
 			ax[axis_num[i][0],axis_num[i][1]].grid()
