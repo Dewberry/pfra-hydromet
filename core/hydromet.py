@@ -14,8 +14,8 @@ import papermill as pm
 import scrapbook as sb
 from zipfile import ZipFile
 from datetime import datetime
-from collections import Counter, OrderedDict
 logging.basicConfig(level=logging.ERROR)
+from collections import Counter, OrderedDict
 from IPython.display import display, Markdown
 
 import numpy as np
@@ -53,6 +53,39 @@ plib = 'pathlib.Path'
 #---------------------------------------------------------------------------#
 
 
+def intersect_temporal_areas(geo_df: geoDF, datarepository_dir: plib, 
+		   Temporal_area_filename: str, alldata: bool=False) -> (dict, geoDF):
+	'''Intersects the area of interest with the NOAA Atlas 14 volumes and 
+	   regions. The volume, region, and percent area of the area of interest 
+	   is returned in a dictionary. If alldata is set to True, the dictionary
+	   returned will contain information for all volumes and regions that 
+	   interesect the area of interest. The keys 'Volume', 'Region', and 
+	   'Percent_area' will always represent the NOAA Atlas 14 volume and 
+	   region that has the largest intersection with the area of interest.
+	'''
+	vol_gdf = gpd.read_file(datarepository_dir/Temporal_area_filename)
+	vol_gdf = vol_gdf.to_crs(geo_df.crs)
+	intersection = gpd.overlay(geo_df, vol_gdf, how='intersection')
+	intersection['area'] = intersection.geometry.apply(lambda x: x.area)
+	t_area = sum(intersection['area'])
+	intersection['p_area'] = intersection.area.apply(lambda x: x/t_area*100)
+	intersection = intersection.sort_values('p_area', ascending=False)
+	intersection = intersection.reset_index(drop=True)
+	d = {}
+	for i in intersection.index:
+		if i == 0:
+			d['Volume'] = intersection.loc[i, 'Volume']
+			d['Region'] = intersection.loc[i, 'Region']
+			d['Percent_area'] = intersection.loc[i, 'p_area']
+		elif i>0 and alldata:
+			d[f'Volume_{i}'] = intersection.loc[i, 'Volume']
+			d[f'Region_{i}'] = intersection.loc[i, 'Region']
+			d[f'Percent_area_{i}'] = intersection.loc[i, 'p_area']
+	for k,v in d.items():
+		print('{:<17s}{:>1s}'.format(str(k),str(v)))
+	return OrderedDict(d), intersection
+
+
 def get_volume_code(datarepository_dir: str, vol_code_filename: str, 
 										vol: int, sub_vol: int = None) -> str:
 	''' Extracts the NOAA Atlas 14 volume code for the specified volume number.
@@ -67,43 +100,6 @@ def get_volume_code(datarepository_dir: str, vol_code_filename: str,
 	os.chdir(orig_dir)
 	print('NOAA Atlas 14 Volume Code:', code)
 	return code
-
-
-def intersect_temporal_areas(geo_df: geoDF, datarepository_dir: plib, alldata: bool = False) -> (dict, geoDF):
-	'''Intersects the area of interest with NOAA Temporal Areas. The volume code, region code, 
-	   and percent area of the area of interest within that region is returned in a dictionary. 
-	   If alldata is set to True, the dictionary returned will contain information for all regions
-	   that the area of interest intersects. The keys 'Volume', 'Region', and 'Percent_area' will
-	   always represent the NOAA Temporal Area that has the largest intersection with the area of
-	   interest.
-	'''
-	vol_gdf = gpd.read_file(datarepository_dir/'NOAA_Temporal_Areas_US.geojson')
-	vol_gdf = vol_gdf.to_crs(geo_df.crs)
-	intersection = gpd.overlay(geo_df, vol_gdf, how='intersection')
-	intersection['area'] = intersection.geometry.apply(lambda x: x.area)
-	total_area = sum(intersection['area'])
-	intersection['p_area'] = intersection.area.apply(lambda x: x/total_area*100)
-	intersection = intersection.sort_values('p_area', ascending=False).reset_index(drop=True)
-	d = {}
-	if alldata:
-		for i in intersection.index:
-			if i == 0:
-				d['Volume'] = intersection.loc[i, 'Volume']
-				d['Region'] = intersection.loc[i, 'Region']
-				d['Percent_area'] = intersection.loc[i, 'p_area']
-			else:
-				d[f'Volume_{i}'] = intersection.loc[i, 'Volume']
-				d[f'Region_{i}'] = intersection.loc[i, 'Region']
-				d[f'Percent_area_{i}'] = intersection.loc[i, 'p_area']
-	else:
-		for i in intersection.index:
-			if i == 0:
-				d['Volume'] = intersection.loc[i, 'Volume']
-				d['Region'] = intersection.loc[i, 'Region']
-				d['Percent_area'] = intersection.loc[i, 'p_area']
-	for k,v in d.items():
-		print('{:<17s}{:>1s}'.format(str(k),str(v)))
-	return OrderedDict(d), intersection
 
 
 def build_precip_table(geo_df: geoDF, all_zips_list: list, noaa_url: str, 
@@ -1413,12 +1409,17 @@ def plot_area_of_interest(geo_df: geoDF, select_data: str,
 	fig.grid()
 
 
-def plot_aoi_noaa_intersection(intersection_gdf: geoDF, select_data: str) -> plt.subplots:
-	'''Plots the intersection of the geodataframe and the NOAA Atlas Temporal Regions.
+def plot_aoi_noaa_intersection(intersection_gdf: geoDF, 
+											select_data: str) -> plt.subplots:
+	'''Plots the intersection of the geodataframe and the NOAA Atlas 14 
+	   volumes and regions.
 	'''
-	intersection_gdf['Volume_Region'] = 'Volume: ' + intersection_gdf['Volume'].map(str) + ', Region: ' + intersection_gdf['Region'].map(str)
-	fig = intersection_gdf.plot(column='Volume_Region', categorical=True, figsize=(10, 14), legend=True)
-	fig.set_title('Area of Interest (ID: {}) by NOAA Atlas Region'.format(select_data))
+	intersection_gdf['Volume_Region'] = 'Volume: {0}, Region {1}'.format(
+	intersection_gdf['Volume'].map(str), intersection_gdf['Region'].map(str))
+	fig = intersection_gdf.plot(column='Volume_Region', categorical=True, 
+												figsize=(10, 14), legend=True)
+	fig.set_title('Area of Interest (ID: {}) by NOAA Atlas' 
+												'Region'.format(select_data))
 	fig.grid()
 
 
