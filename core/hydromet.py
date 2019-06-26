@@ -184,6 +184,19 @@ def get_input_data(precip_table_dir: str, duration: int, lower_limit: int=2,
 	return df_truncated
 
 
+def get_volume_region(precip_table_dir: str, vol_col: str='Volume', 
+					reg_col: str='Region', display_print: bool=True) -> list:
+    '''Extracts the NOAA Atlas 14 volume and region from the Excel file 
+       created by PrecipTable.ipynb
+    '''
+    df = pd.read_excel(precip_table_dir, sheet_name = 'NOAA_Atlas_MetaData')
+    vol =df[vol_col][0]
+    reg = df[reg_col][0]
+    results = [vol, reg]
+    if display_print: print('NOAA Atlas 14: Volume {}, Region {}'.format(vol, reg))
+    return results
+
+
 def get_temporal_map(data_dir: str, filename: str, vol: int, reg: int, 
 								dur: int, display_print: bool=True) -> dict:
 	'''Reads the json file containing the temporal distribution data metadata
@@ -248,6 +261,17 @@ def get_duration_weight(data_dir: str, filename: str, vol: int, reg: int,
 	w=df[(df.index==dur)  & (df['Region']==reg)]['Duration Weight'].values[0]  
 	if display_print: print(w)
 	return w
+
+
+def get_CN(pluvial_params_dir: str, AOI: str, 
+											display_print: bool=True) -> int:
+    '''Extracts the curve number for the specified area of interest from 
+       the pluvial parameters table. 
+    '''
+    df = pd.read_excel(pluvial_params_dir, sheet_name = 'Pluvial_Domain')
+    if display_print: print(display(df[df['Pluvial Domain']==AOI]))
+    CN = int(np.round((df[df['Pluvial Domain']==AOI]['Curve Number'][0])))
+    return CN
 
 
 def get_CN_distribution(data_dir: str, filename: str, 
