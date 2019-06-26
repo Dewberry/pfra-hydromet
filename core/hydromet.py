@@ -1410,17 +1410,19 @@ def plot_area_of_interest(geo_df: geoDF, select_data: str,
 
 
 def plot_aoi_noaa_intersection(intersection_gdf: geoDF, 
-                                            select_data: str) -> plt.subplots:
-    '''Plots the intersection of the geodataframe and the NOAA Atlas 14 
-       volumes and regions.
-    '''
-    intersection_gdf['Volume_Region'] = 'Volume: {0}, Region {1}'.format(
-    intersection_gdf['Volume'].map(str), intersection_gdf['Region'].map(str))
-    fig = intersection_gdf.plot(column='Volume_Region', categorical=True, 
-                                                figsize=(10, 14), legend=True)
-    fig.set_title('Area of Interest (ID: {}) by NOAA Atlas' 
-                                                'Region'.format(select_data))
-    fig.grid()
+											select_data: str) -> plt.subplots:
+	'''Plots the intersection of the geodataframe and the NOAA Atlas 14 
+	   volumes and regions.
+	'''
+	intersection_gdf['Volume_Region'] = 'Volume: ' +\
+                        intersection_gdf['Volume'].map(str) + ', Region: ' +\
+                                            intersection_gdf['Region'].map(str)
+	fig = intersection_gdf.plot(column='Volume_Region', categorical=True, 
+												figsize=(10, 14), legend=True)
+	fig.set_title('Area of Interest (ID: {}) by NOAA Atlas' 
+												'Region'.format(select_data))
+	fig.grid()
+
 
 
 def plot_rand_precip_data(df: pd.DataFrame, rand_data: list, duration: int,
