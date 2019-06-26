@@ -1414,8 +1414,9 @@ def plot_aoi_noaa_intersection(intersection_gdf: geoDF,
 	'''Plots the intersection of the geodataframe and the NOAA Atlas 14 
 	   volumes and regions.
 	'''
-	intersection_gdf['Volume_Region'] = 'Volume: {0}, Region {1}'.format(
-	intersection_gdf['Volume'].map(str), intersection_gdf['Region'].map(str))
+	intersection_gdf['Volume_Region'] = 'Volume: ' +\
+    intersection_gdf['Volume'].map(str) + ', Region: ' +\
+    intersection_gdf['Region'].map(str)
 	fig = intersection_gdf.plot(column='Volume_Region', categorical=True, 
 												figsize=(10, 14), legend=True)
 	fig.set_title('Area of Interest (ID: {}) by NOAA Atlas' 
