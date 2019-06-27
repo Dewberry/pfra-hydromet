@@ -185,7 +185,7 @@ def get_input_data(precip_table_dir: str, duration: int, lower_limit: int=2,
 
 
 def get_volume_region(precip_table_dir: str, vol_col: str='Volume', 
-					reg_col: str='Region', display_print: bool=True) -> list:
+                    reg_col: str='Region', display_print: bool=True) -> list:
     '''Extracts the NOAA Atlas 14 volume and region from the Excel file 
        created by PrecipTable.ipynb
     '''
@@ -264,13 +264,13 @@ def get_duration_weight(data_dir: str, filename: str, vol: int, reg: int,
 
 
 def get_CN(pluvial_params_dir: str, AOI: str, 
-											display_print: bool=True) -> int:
+                                            display_print: bool=True) -> int:
     '''Extracts the curve number for the specified area of interest from 
        the pluvial parameters table. 
     '''
     df = pd.read_excel(pluvial_params_dir, sheet_name = 'Pluvial_Domain')
     if display_print: print(display(df[df['Pluvial Domain']==AOI]))
-    CN = int(np.round((df[df['Pluvial Domain']==AOI]['Curve Number'][0])))
+    CN=int(np.round((df[df['Pluvial Domain']==AOI]['Curve Number'].values[0])))
     return CN
 
 
@@ -1233,6 +1233,23 @@ def extract_event_metadata(outfiles: list, events_metadata: dict,
     return metadata
 
 
+def get_stormwater_rate_cap(pluvial_params_dir: plib, BCN: str, 
+                                        display_print: bool=True) -> list:
+    '''Extract the stormwater removal rate and capacity from the pluvial 
+       parameters Excel Workbook for the specified boundary condition name. 
+    '''
+    df = pd.read_excel(pluvial_params_dir, sheet_name = 'Pluvial_Domain')
+    pp = df[df['Pluvial Domain']==BCN]
+    rate = pp['SW Rate (in/30min)'].values[0]
+    maxcap = pp['SW Capacity (in/unit area)'].values[0]
+    rate_cap = [rate, maxcap]
+    if display_print: 
+        print(display(pp.head(2)))
+        print('SW Rate: {0} in/30min\nSW Capacity: {1} in/unit '
+                                                'area'.format(rate, maxcap))
+    return rate_cap
+
+
 def determine_timestep(dic_dur: dict, display_print: bool=True) -> float:
     '''Calculates the timestep of the rainfall excess data contained within
        the passed dictionary.
@@ -1289,6 +1306,46 @@ def reduced_excess(event: list, adj_rate: float, max_capacity: float) -> list:
     return reduced_event
 
 
+def calc_lateral_inflow_hydro(lid: pd.DataFrame, ReducedTable: dict, 
+                            StormwaterTable: dict, durations: list, BCN: str, 
+                        display_print: bool=True, display_plots: bool=True, 
+                                                plot_lid_num: int=0) -> dict:
+    '''Calculate the lateral inflow hydrographs for each event and domain 
+       given the lateral inflow contributing area.
+    '''
+    lid_names = list(lid['Lateral Inflow Domain'])
+    if display_print: print('Lateral Inflow Domains:', lid_names)
+    for dur in durations:
+        ReducedTable[dur]['lateral_BC_units'] = 'cfs'
+        ts = determine_timestep(StormwaterTable[dur], display_print=False)
+        events_dic = StormwaterTable[dur]['BCName'][BCN]
+        for l in lid_names:
+            slicedf = lid[lid['Lateral Inflow Domain']==l]
+            a_sqmile = slicedf['Lateral Inflow Area (miles^2)'].values[0]
+            a_sqft = a_sqmile*5280.0**2
+            li_dic = {}
+            for k, v in events_dic.items():
+                Q_per_ts = [(x/12.0)*a_sqft for x in v]
+                li_dic[k] = [x/(ts*60.0*60.0) for x in Q_per_ts]
+                ReducedTable[dur]['BCName'][l] = li_dic
+    l = lid_names[plot_lid_num]
+    if display_plots: 
+        plot_lateral_inflow_hydro(ReducedTable, durations, l)               
+    return ReducedTable
+
+
+def get_lateral_inflow_domains(pluvial_params_dir: plib, BCN: str, 
+                                display_print: bool=True) -> pd.DataFrame:
+    '''Load the pluvial parameters Excel Worksheet and extract the later 
+       inflow domains corresponding with the specified boundary condition 
+       name.
+    '''
+    df=pd.read_excel(pluvial_params_dir, sheet_name = 'Lateral_Inflow_Domain')
+    lid = df[df['Pluvial Domain']==BCN].copy(deep=True)
+    if display_print: print(display(lid.head(2)))
+    return lid
+
+
 def combine_results(var: str, outputs_dir: str, AOI: str, 
             durations: list, tempEpsilon_dic: dict, convEpsilon_dic: dict, 
     volEpsilon_dic: dict, BCN: str=None, remove_ind_dur: bool = True) -> dict:
@@ -1314,7 +1371,8 @@ def combine_results(var: str, outputs_dir: str, AOI: str,
                 if 'E' in k:
                     events[k] = list(v.values())
             key ='H{0}'.format(str(dur).zfill(2))
-            val = {'time_idx_ordinate': ordin, 'time_idx': dates, 'BCName': {BCN: events}}         
+            val = {'time_idx_ordinate': ordin, 'time_idx': dates, 
+                    'pluvial_BC_units': 'inch/ts', 'BCName': {BCN: events}}         
             dic[key] = val
         elif var == 'Weights':
             df_lst.append(df)
@@ -1434,18 +1492,18 @@ def plot_area_of_interest(geo_df: geoDF, select_data: str,
 
 
 def plot_aoi_noaa_intersection(intersection_gdf: geoDF, 
-											select_data: str) -> plt.subplots:
-	'''Plots the intersection of the geodataframe and the NOAA Atlas 14 
-	   volumes and regions.
-	'''
-	intersection_gdf['Volume_Region'] = 'Volume: ' +\
-						intersection_gdf['Volume'].map(str) + ', Region: ' +\
-										intersection_gdf['Region'].map(str)
-	fig = intersection_gdf.plot(column='Volume_Region', categorical=True, 
-												figsize=(10, 14), legend=True)
-	fig.set_title('Area of Interest (ID: {}) by NOAA Atlas' 
-												'Region'.format(select_data))
-	fig.grid()
+                                            select_data: str) -> plt.subplots:
+    '''Plots the intersection of the geodataframe and the NOAA Atlas 14 
+       volumes and regions.
+    '''
+    intersection_gdf['Volume_Region'] = 'Volume: ' +\
+                        intersection_gdf['Volume'].map(str) + ', Region: ' +\
+                                        intersection_gdf['Region'].map(str)
+    fig = intersection_gdf.plot(column='Volume_Region', categorical=True, 
+                                                figsize=(10, 14), legend=True)
+    fig.set_title('Area of Interest (ID: {}) by NOAA Atlas' 
+                                                'Region'.format(select_data))
+    fig.grid()
 
 
 
@@ -1484,30 +1542,30 @@ def plot_rand_precip_data(df: pd.DataFrame, rand_data: list, duration: int,
 
 
 def plot_deciles_by_quartile(curve_group: dict, qrank: list,
-				qmap: dict, vol: int, reg: int, dur: int) -> plt.subplots:
-	'''Plots the temporal distribution at each decile for each quartile. 
-	'''
-	fig, ax = plt.subplots(2,2, figsize=(24,10))
-	for axi in ax.flat:
-		axi.xaxis.set_major_locator(plt.MultipleLocator((
-											curve_group['q1'].shape[0]-1)/6))
-		axi.xaxis.set_minor_locator(plt.MultipleLocator(1))
-	axis_num=[[0,0], [0,1], [1,0], [1,1]]
-	for i, val in enumerate(qmap['map'].keys()):
-		for col in curve_group[val].columns:
-			plt.suptitle('Volume '+str(vol)+' Region '+str(reg)+' Duration '+\
-								str(dur), fontsize = 20, x  = 0.507, y = 1.02)
-			ax[axis_num[i][0],axis_num[i][1]].plot(curve_group[val][col], 
-																label=col) 
-			ax[axis_num[i][0],axis_num[i][1]].grid()
-			ax[axis_num[i][0],axis_num[i][1]].set_title('Quartile {0}\n{1}%'
-					' of Cases'.format(i+1, int(qrank[i]*100)), fontsize=16)
-			ax[axis_num[i][0],axis_num[i][1]].legend(title='Deciles')
-			ax[axis_num[i][0],axis_num[i][1]].set_xlabel('Time (hours)', 
-																fontsize=14)
-			ax[axis_num[i][0],axis_num[i][1]].set_ylabel('Precip (% Total)', 
-																fontsize=14)
-	plt.tight_layout()
+                qmap: dict, vol: int, reg: int, dur: int) -> plt.subplots:
+    '''Plots the temporal distribution at each decile for each quartile. 
+    '''
+    fig, ax = plt.subplots(2,2, figsize=(24,10))
+    for axi in ax.flat:
+        axi.xaxis.set_major_locator(plt.MultipleLocator((
+                                            curve_group['q1'].shape[0]-1)/6))
+        axi.xaxis.set_minor_locator(plt.MultipleLocator(1))
+    axis_num=[[0,0], [0,1], [1,0], [1,1]]
+    for i, val in enumerate(qmap['map'].keys()):
+        for col in curve_group[val].columns:
+            plt.suptitle('Volume '+str(vol)+' Region '+str(reg)+' Duration '+\
+                                str(dur), fontsize = 20, x  = 0.507, y = 1.02)
+            ax[axis_num[i][0],axis_num[i][1]].plot(curve_group[val][col], 
+                                                                label=col) 
+            ax[axis_num[i][0],axis_num[i][1]].grid()
+            ax[axis_num[i][0],axis_num[i][1]].set_title('Quartile {0}\n{1}%'
+                    ' of Cases'.format(i+1, int(qrank[i]*100)), fontsize=16)
+            ax[axis_num[i][0],axis_num[i][1]].legend(title='Deciles')
+            ax[axis_num[i][0],axis_num[i][1]].set_xlabel('Time (hours)', 
+                                                                fontsize=14)
+            ax[axis_num[i][0],axis_num[i][1]].set_ylabel('Precip (% Total)', 
+                                                                fontsize=14)
+    plt.tight_layout()
 
 
 def plot_decile_histogram(df: pd.DataFrame) -> plt.subplots:
@@ -1596,8 +1654,8 @@ def plot_grouped_curves(final_curves: dict, y_max: float,
 def plot_reduced_excess(ReducedTable: dict, EventsTable: dict, 
                     durations: list, selected_BCN: str, subplot_len: int=4, 
                                     title_adj: float=0.008) -> plt.subplot:
-    '''Plot the excess rainfall and reduced excess rainfall for the first two
-       events of each duration within the passed dictionaries.
+    '''Plot the excess rainfall and reduced excess rainfall for the first and
+       last events of each duration within the passed dictionaries.
     '''
     n = len(durations)
     fig, ax = plt.subplots(n, 1, figsize=(18, n*subplot_len+2))
@@ -1612,14 +1670,43 @@ def plot_reduced_excess(ReducedTable: dict, EventsTable: dict,
         dic_re = ReducedTable[dur]['BCName'][selected_BCN]
         dic_ex = EventsTable[dur]['BCName'][selected_BCN]
         keys =  list(dic_re.keys())
-        n_keys = len(keys)
-        sub_keys = [keys[0], keys[n_keys-1]]
+        sub_keys = [keys[0], keys[-1]]
         c = ['green', 'blue']
         for j, k in enumerate(sub_keys):
             ax_obj.plot(idx, dic_ex[k], linestyle = '-', label=k, color=c[j])        
             ax_obj.plot(idx,dic_re[k],linestyle='--',label=f'{k} (Reduced)',color=c[j])   
         ax_obj.set_xlabel('Time, [{}]'.format(units))
         ax_obj.set_ylabel('Excess Rainfall, [inches]')
+        ax_obj.grid()
+        ax_obj.legend()
+    fig.tight_layout()
+    fig.subplots_adjust(top=0.94+title_adj*(n-1))
+
+
+def plot_lateral_inflow_hydro(ReducedTable: dict, durations: list, BCN: str, 
+                subplot_len: int=4, title_adj: float=0.008) -> plt.subplot:
+    '''Plot the lateral inflow hydrographs for the specified lateral inflow 
+       boundary for the first and last events of each duration.
+    '''
+    n = len(durations)
+    fig, ax = plt.subplots(n, 1, figsize=(18, n*subplot_len+2))
+    fig.suptitle( 'Lateral Inflow Hydrographs for {}'.format(BCN), size = 16)
+    for i, dur in enumerate(durations):
+        if n == 1: 
+            ax_obj = ax
+        else:
+            ax_obj = ax[i]
+        idx = ReducedTable[dur]['time_idx']
+        time_units = ReducedTable[dur]['time_idx_ordinate']
+        lih_units = ReducedTable[dur]['lateral_BC_units']
+        dic_re = ReducedTable[dur]['BCName'][BCN]
+        keys =  list(dic_re.keys())
+        sub_keys = [keys[0], keys[-1]]
+        c = ['green', 'blue']
+        for j, k in enumerate(sub_keys):
+            ax_obj.plot(idx, dic_re[k], linestyle = '-', label=k, color=c[j])        
+        ax_obj.set_xlabel('Time, [{}]'.format(time_units))
+        ax_obj.set_ylabel('Discharge, [{}]'.format(lih_units))
         ax_obj.grid()
         ax_obj.legend()
     fig.tight_layout()

@@ -2,10 +2,10 @@ from hydromet import*
 
 
 #---------------------------------------------------------------------------#
-def main(EventsTable: dict, durations: list, BCN: list, 
+def main(EventsTable: dict, durations: list, BCN: str, 
             rand_rate_cap: bool=False, rate: float=None, maxcap: float=None, 
                     minrate: float=None, maxrate: float=None, seed: int=None, 
-                                        display_print: bool=True) -> list:
+                display_print: bool=True, display_plots: bool=True) -> list:
     '''Calculates the reduced excess rainfall for each event within the 
        EventsTable dictionary. 
         
@@ -14,7 +14,7 @@ def main(EventsTable: dict, durations: list, BCN: list,
        Eventstable: A dictionary containing the incremental excess rainfall 
                     for a suite of randomly generated events.
        durations: A list of event durations, i.e ['H06', 'H12', ...]
-       BCN: A list of boundary condition names, i.e. ['D01', 'D02', ...]
+       BCN: The boundary condition name as a string, i.e 'D01'
        rand_rate_cap: Bool indicating whether to randomly select the stormwater
                       removal rate and capacity or whether to use the 
                       user-specified values. 
@@ -26,7 +26,8 @@ def main(EventsTable: dict, durations: list, BCN: list,
                 when rand_rate_cap is set to 'True'.
        seed: The random number generator seed as an integer.
        display_print: Bool specifying whether to display print statements.
-   
+       display_plots: Bool specifying whether to display the plot.
+
        Returns
        -------
        results: A list of dictionaries, which included the incremental reduced
@@ -55,21 +56,22 @@ def main(EventsTable: dict, durations: list, BCN: list,
                 print('Rate:', adj_rate, 'Maximum Capacity:', maxcap)
         dic_BCN = {}
         dic_BCN_SW = {}
-        for name in BCN:
-            dic_events = dic_dur['BCName'][name]
-            dic_reduced = {}
-            dic_stormwater = {}
-            for event in dic_events.keys():
-                unred = dic_events[event]
-                red = reduced_excess(unred, adj_rate, maxcap)
-                dic_reduced[event] = red
-                dic_stormwater[event] = list(np.array(unred)-np.array(red))
-            dic_BCN[name] = dic_reduced
-            dic_BCN_SW[name] = dic_stormwater
+        dic_reduced = {}
+        dic_stormwater = {}
+        dic_events = dic_dur['BCName'][BCN]
+        for event in dic_events.keys():
+            unred = dic_events[event]
+            red = reduced_excess(unred, adj_rate, maxcap)
+            dic_reduced[event] = red
+            dic_stormwater[event] = list(np.array(unred)-np.array(red))
+            dic_BCN[BCN] = dic_reduced
+            dic_BCN_SW[BCN] = dic_stormwater
         RTab[d] = {'time_idx_ordinate':tord,'time_idx':tidx,'BCName':dic_BCN}
         STab[d]={'time_idx_ordinate':tord,'time_idx':tidx,'BCName':dic_BCN_SW}
         SW_variables[d] = {'Rate': adj_rate, 'Capacity': maxcap, 'Seed':seed}
     results = [RTab, STab, SW_variables]
+    if display_plots: 
+        plot_reduced_excess(RTab, EventsTable, durations, BCN)
     return results
 
 if __name__== "__main__":
