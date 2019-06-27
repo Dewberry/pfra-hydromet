@@ -1233,6 +1233,19 @@ def extract_event_metadata(outfiles: list, events_metadata: dict,
     return metadata
 
 
+def checkif_SWinfra(pluvial_params_dir: plib, BCN: str, 
+                                            display_print: bool=True) -> str:
+    '''Check the pluvial parameters Excel Workbook to determine if the 
+       specified pluvial domain has stormwater infrastructure.
+    '''
+    df = pd.read_excel(pluvial_params_dir, sheet_name = 'Pluvial_Domain')
+    pp = df[df['Pluvial Domain']==BCN]
+    run_reduced = pp['SW Infrastructure (YES or NO)'].values[0]
+    if display_print: 
+        print('Is there stormwater infrastructure? ->', run_reduced)
+    return run_reduced
+
+
 def get_stormwater_rate_cap(pluvial_params_dir: plib, BCN: str, 
                                         display_print: bool=True) -> list:
     '''Extract the stormwater removal rate and capacity from the pluvial 
