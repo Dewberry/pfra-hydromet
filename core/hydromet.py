@@ -1727,7 +1727,7 @@ def plot_lateral_inflow_hydro(ReducedTable: dict, durations: list, BCN: str,
 
 
 def plot_amount_vs_weight(weights_dic: dict, excess_dic: dict, mainBCN: str,
-											 distalBCN: str) -> plt.subplots:
+									distalBCN: str='mainBCN') -> plt.subplots:
     '''Plot the total excess rainfall for each event versus its weight.
     '''
     fig, ax = plt.subplots(1,1, figsize=(24,5))
@@ -1742,7 +1742,8 @@ def plot_amount_vs_weight(weights_dic: dict, excess_dic: dict, mainBCN: str,
         ax.plot(weight, runoff, linestyle = '', marker = '.', label = dur)
     ax.set_xlabel('Event Weight, [-]')
     ax.set_ylabel('Excess Rainfall, [inches]')
-    ax.set_title('Excess Rainfall Amount Versus Event Weight ({} Events)'.format(n))
+    ax.set_title('Excess Rainfall Amount Versus Event Weight '
+                                                    '({} Events)'.format(n))
     ax.grid()
     ax.legend()    
 
