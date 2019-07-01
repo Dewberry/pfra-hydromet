@@ -2,9 +2,9 @@ from hydromet import*
 
 
 #---------------------------------------------------------------------------#
-def main(md: dict, weights_dic: dict, durations: list, name: str, CN: int, 
-                    arc_data: dict, Model: str, AOI: str, outputs_dir: str, 
-                        time_idx_ordinate: str, adjust_CN_less24: bool=False, 
+def main(md: dict, weights_dic: dict, durations: list, mainBCN: str, CN: int, 
+    arc_data: dict, Project_Area: str,  Pluvial_Model: str, distalBCN: str, 
+    outputs_dir: plib, time_idx_ordinate: str, adjust_CN_less24: bool=False, 
                     remove_intermediates: bool=True, display_print: bool=True, 
                                                     plot: bool=True) -> None:
     '''Extracts data from the metadata dictionary, calculates random curve 
@@ -21,7 +21,7 @@ def main(md: dict, weights_dic: dict, durations: list, name: str, CN: int,
        CN: the user-specified curve number as an integer.
        arc_data: a dictionary containing the AMCI and AMCIII values for the
                  specified curve number.
-       AOI: Name of the area of interest as a string.
+       distalBCN: Name of the area of interest as a string.
        outputs_dir: The path for saving the outputs, including intermediate
                     and final results
        adjust_CN_less24: Bool specifying whether to adjust the curve number
@@ -42,39 +42,44 @@ def main(md: dict, weights_dic: dict, durations: list, name: str, CN: int,
         idur = int(dur.replace('H', ''))
         if display_print: 
               print('Calculating excess rainfall and grouping the {} hour '
-                                        'duration for {}'.format(idur, AOI))
-        scen = md[dur]['BCName'][name]
+                                    'duration for {}'.format(idur, distalBCN))
+        scen = md[dur]['BCName'][mainBCN]
         groups = scen['groups']
         precip = scen['precip']
         metadata = scen['events_metadata']
         eventID = metadata['EventID']
-        n_rand_events = len(eventID.keys())
+        nevents = len(eventID.keys())
         params = scen['parameters']
         seed = params['seed']
-        tempEpsilon = params['tempEpsilon']
-        tempEpsilon2 = params['tempEpsilon2']
-        convEpsilon = params['convEpsilon']
-        volEpsilon = params['volEpsilon']
+        tempE = params['tempEpsilon']
+        tempE2 = params['tempEpsilon2']
+        convE = params['convEpsilon']
+        volE = params['volEpsilon']
         df_CN = prep_cn_table(CN, arc_data) 
         fitted_cn = find_optimal_curve_beta_dist_S(df_CN)
-        fn_CN = "Rand_CN_distal_{0}_Dur{1}_tempE{2}_convE{3}_volE{4}_Se{5}.csv".format(AOI, idur, tempEpsilon, convEpsilon, volEpsilon, seed)
-        random_cns = RandomizeData(fitted_cn, n_rand_events, outputs_dir, fn_CN, seed = seed, variable = 'CN', display_print = False)
-        cum_excess, final_precip, incr_excess = calc_excess_rainfall(eventID, precip, random_cns, idur, adjust_CN_less24)
+        fnbase = 'Dur{0}_tempE{1}_convE{2}_volE{3}'.format(idur, tempE, 
+                                                                convE, volE)
+        fn_CN = "Rand_CN_distal_{0}_{1}_Se{2}.csv".format(distalBCN, fnbase,
+                                                                        seed)
+        random_cns = RandomizeData(fitted_cn, nevents, outputs_dir, 
+                fn_CN, seed = seed, variable = 'CN', display_print = False)
+        cum_excess, final_precip, incr_excess = calc_excess_rainfall(eventID, 
+                                precip, random_cns, idur, adjust_CN_less24)
         final_curves = calc_mean_curves(groups, incr_excess) 
-        fn_Excess = 'Excess_Rainfall_distal_{0}_Dur{1}_tempE{2}_convE{3}_volE{4}.csv'.format(AOI, idur, tempEpsilon, convEpsilon, volEpsilon)
+        fn_Excess = 'Excess_Rainfall_distal_{0}_{1}.csv'.format(distalBCN,
+                                                                     fnbase) 
         final_curves.to_csv(outputs_dir/fn_Excess)
-        outfiles.append(outputs_dir/fn_Excess)
+        outfiles.append(fn_Excess)
         dic_metadata = {}
         updated_metadata = {}
         dic_metadata['groups'] = dic_key_to_str(groups)
         dic_metadata['precip'] = final_precip.to_dict()
         dic_metadata['cum_excess'] = cum_excess.to_dict()
         dic_metadata['incr_excess'] = incr_excess.to_dict()
-        dic_metadata['parameters'] = {'seed':seed,
-                                      'tempEpsilon': tempEpsilon,
-                                      'tempEpsilon2': tempEpsilon2, 
-                                      'convEpsilon': convEpsilon,
-                                      'volEpsilon': volEpsilon}
+        dic_metadata['parameters'] = {'seed':seed, 'tempEpsilon': tempE,
+                                      'tempEpsilon2': tempE2, 
+                                      'convEpsilon': convE,
+                                      'volEpsilon': volE}
         for k in metadata:
               if 'CN' not in k:
                   updated_metadata[k] = metadata[k]
@@ -91,24 +96,29 @@ def main(md: dict, weights_dic: dict, durations: list, name: str, CN: int,
         for col in df.columns:
               updated_metadata[col] = df[col].to_dict()  
         dic_metadata['events_metadata'] = updated_metadata
-        fn_MD = 'Metadata_distal_{0}_Dur{1}_tempE{2}_convE{3}_volE{4}.json'.format(AOI, idur, tempEpsilon, convEpsilon, volEpsilon)
+        fn_MD = 'Metadata_distal_{0}_{1}.json'.format(distalBCN, fnbase)
         with open(outputs_dir/fn_MD, 'w') as f:
               json.dump(dic_metadata, f)
-        outfiles.append(outputs_dir/fn_MD)
+        outfiles.append(fn_MD)
         if plot:
               plot_rainfall_and_excess(final_precip, cum_excess, idur)
               y_max = final_curves.max().max()
               plot_grouped_curves(final_curves, y_max) 
     outfiles = extract_list(outfiles)
-    excess_dic = combine_distal_results(outfiles, 'Excess', AOI,
-            ordin = time_idx_ordinate, remove_ind_dur = remove_intermediates)
-    with open(outputs_dir/'distal_{0}_{1}.json'.format(AOI, Model),'w') as f:
+    excess_dic = combine_distal_results(outfiles, outputs_dir, 'Excess',
+                                        distalBCN, ordin = time_idx_ordinate, 
+                                        remove_ind_dur = remove_intermediates)
+    fn_final = '{0}_{1}_{2}_distal'.format(Project_Area, Pluvial_Model,
+                                                                    distalBCN)
+    with open(outputs_dir/'{0}.json'.format(fn_final),'w') as f:
         json.dump(excess_dic, f)     
-    metadata = combine_distal_results(outfiles, 'Metadata', AOI,
-            ordin = time_idx_ordinate, remove_ind_dur = remove_intermediates)
-    with open(outputs_dir/'Metadata_distal_{0}_{1}.json'.format(AOI, Model),'w') as f:
+    metadata = combine_distal_results(outfiles, outputs_dir, 'Metadata', 
+                                        distalBCN, ordin = time_idx_ordinate, 
+                                        remove_ind_dur = remove_intermediates)
+    with open(outputs_dir/'{0}_Metadata.json'.format(fn_final),'w') as f:
         json.dump(metadata, f)   
-    if plot: plot_amount_vs_weight(weights_dic, excess_dic, AOI)                  
+    if plot: 
+        plot_amount_vs_weight(weights_dic, excess_dic, mainBCN, distalBCN)                  
     return 
 if __name__== "__main__":
     main()

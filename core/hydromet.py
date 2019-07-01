@@ -263,14 +263,15 @@ def get_duration_weight(data_dir: str, filename: str, vol: int, reg: int,
     return w
 
 
-def get_CN(pluvial_params_dir: str, AOI: str, 
+def get_CN(pluvial_params_dir: str, BCN: str, 
                                             display_print: bool=True) -> int:
-    '''Extracts the curve number for the specified area of interest from 
-       the pluvial parameters table. 
+    '''Extracts the curve number for the specified area of interest from the
+       pluvial parameters table. 
     '''
     df = pd.read_excel(pluvial_params_dir, sheet_name = 'Pluvial_Domain')
-    if display_print: print(display(df[df['Pluvial Domain']==AOI]))
-    CN=int(np.round((df[df['Pluvial Domain']==AOI]['Curve Number'].values[0])))
+    pp = df[df['Pluvial Domain']==BCN]
+    if display_print: print(display(pp))
+    CN = int(np.round((pp['Curve Number'].values[0])))
     return CN
 
 
@@ -1422,35 +1423,34 @@ def combine_metadata(outputs_dir: str, AOI: str, durations: list,
     return dic   
     
 
-def combine_distal_results(outfiles: list, var: str, BCN: list, 
-                        ordin: str='Hours', remove_ind_dur: bool=True) -> dict:
+def combine_distal_results(outfiles: list, outputs_dir: plib, var: str, 
+			BCN: str, ordin: str='Hours', remove_ind_dur: bool=True) -> dict:
     '''Combines the excess rainfall results and metadata for each duration 
        into a single file for all durations.
     '''
-    assert len(BCN)==1, 'Update function to handle multiple boundary conditions'
     dic = {}
     for file in outfiles:
-        if var=='Excess' and 'Excess' in str(file):
+        if var == 'Excess' and 'Excess' in str(file):
             dur = int(str(file).split('_')[4].replace('Dur', ''))
-            df = pd.read_csv(file, index_col = 0)
+            df = pd.read_csv(outputs_dir/file, index_col = 0)
             df_dic = df.to_dict()
             dates = list(df.index)
             events = {}
             for k, v in df_dic.items():
                 if 'E' in k:
                     events[k] = list(v.values())
-            val = {'time_idx_ordinate': ordin, 'time_idx': dates, 'BCName': {BCN[0]: events}}  
+            val = {'time_idx_ordinate': ordin, 'time_idx': dates, 'BCName': {BCN: events}}  
         elif var=='Metadata' and 'Metadata' in str(file):
             dur = int(str(file).split('_')[3].replace('Dur', ''))
-            with open(file) as f:
+            with open(outputs_dir/file) as f:
                 md =  json.load(f)
-            val = {'BCName': {BCN[0]: md}}
+            val = {'BCName': {BCN: md}}
         else:
             continue        
         key ='H{0}'.format(str(dur).zfill(2))
         dic[key] = val
         if remove_ind_dur:
-             os.remove(file)
+             os.remove(outputs_dir/file)
     return dic
 
 
@@ -1726,8 +1726,8 @@ def plot_lateral_inflow_hydro(ReducedTable: dict, durations: list, BCN: str,
     fig.subplots_adjust(top=0.94+title_adj*(n-1))
 
 
-def plot_amount_vs_weight(weights_dic: dict, 
-                                excess_dic: dict, BCN: str) -> plt.subplots:
+def plot_amount_vs_weight(weights_dic: dict, excess_dic: dict, mainBCN: str,
+											 distalBCN: str) -> plt.subplots:
     '''Plot the total excess rainfall for each event versus its weight.
     '''
     fig, ax = plt.subplots(1,1, figsize=(24,5))
@@ -1735,10 +1735,10 @@ def plot_amount_vs_weight(weights_dic: dict,
     for dur in excess_dic.keys():
         weight = []
         runoff = []
-        for k in excess_dic[dur]['BCName'][BCN].keys():
+        for k in excess_dic[dur]['BCName'][distalBCN].keys():
             n+=1
-            runoff.append(sum(excess_dic[dur]['BCName'][BCN][k]))
-            weight.append(weights_dic['BCName'][BCN][k])
+            runoff.append(sum(excess_dic[dur]['BCName'][distalBCN][k]))
+            weight.append(weights_dic['BCName'][mainBCN][k])
         ax.plot(weight, runoff, linestyle = '', marker = '.', label = dur)
     ax.set_xlabel('Event Weight, [-]')
     ax.set_ylabel('Excess Rainfall, [inches]')
