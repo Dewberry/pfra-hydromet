@@ -810,17 +810,21 @@ def convert_tempEpsilon(tempEpsilon: float, incr_excess: pd.DataFrame) -> int:
 
 
 def bin_sorting_dev(incr_excess: pd.DataFrame, nbins: int, 
-                                        display_print: bool = True) -> list:
+                min_thresh: float=0.01, display_print: bool = True) -> list:
     '''Computes the histogram of the series data with the specified number
        of bins and returns the results as a list.
     '''
     runoff_data= incr_excess.sum()
-    hist_data = np.histogram(runoff_data, bins=nbins)
+    runoff_data_0 = runoff_data[runoff_data<min_thresh]
+    runoff_data_non0 = runoff_data[runoff_data>=min_thresh]
+    hist_data = np.histogram(runoff_data_non0, bins=50)
     bins = hist_data[1]
     binCount = hist_data[0]
     binData = dict(zip(binCount, bins))
     binData.pop(0, None)# Drop the last zero
     binData = sorted(binData.items(), key=operator.itemgetter(1))
+    n_zero = len(runoff_data_0)
+    if n_zero > 0: binData = [(n_zero, 0.0)]+binData
     if display_print: print(display(binData))
     return binData
 
@@ -896,14 +900,19 @@ def test_stat(c_df: pd.DataFrame, nc_df: pd.DataFrame, c: str, nc: str,
        Note that in this function's code, "c" and "nc" refer to "column" 
        and "next column", respectively.
     '''
-    perc_dif = abs(c_df[c]-nc_df[nc])/((c_df[c]+nc_df[nc])/2.0)*100.0
-    max_perc_dif = perc_dif.max() 
-    total_dif = abs(c_df[c].sum()-nc_df[nc].sum())
-    total_sum = c_df[c].sum()+nc_df[nc].sum()
-    perc_dif_total = total_dif/(total_sum/2.0)*100.0 
-    st1 = (convEpsilon-max_perc_dif)/convEpsilon
-    st2 = (volEpsilon-perc_dif_total)/volEpsilon
-    test = np.round(1 - np.sqrt((st1-1)**2+(st2-1)**2), 6)
+    dif = abs(c_df[c]-nc_df[nc])
+    avg = (c_df[c]+nc_df[nc])/2.0
+    if all(x==0.0 for x in avg):
+        test = 1.0
+    else:   
+        perc_dif = dif/avg*100.0
+        max_perc_dif = perc_dif.max() 
+        total_dif = abs(c_df[c].sum()-nc_df[nc].sum())
+        total_sum = c_df[c].sum()+nc_df[nc].sum()
+        perc_dif_total = total_dif/(total_sum/2.0)*100.0     
+        st1 = (convEpsilon-max_perc_dif)/convEpsilon
+        st2 = (volEpsilon-perc_dif_total)/volEpsilon
+        test = np.round(1 - np.sqrt((st1-1)**2+(st2-1)**2), 6)
     return test
 
 
@@ -1431,7 +1440,7 @@ def combine_distal_results(outfiles: list, outputs_dir: plib, var: str,
     dic = {}
     for file in outfiles:
         if var == 'Excess' and 'Excess' in str(file):
-            dur = int(str(file).split('_')[4].replace('Dur', ''))
+            dur = int(str(file).split('_')[3].replace('Dur', ''))
             df = pd.read_csv(outputs_dir/file, index_col = 0)
             df_dic = df.to_dict()
             dates = list(df.index)
@@ -1441,7 +1450,7 @@ def combine_distal_results(outfiles: list, outputs_dir: plib, var: str,
                     events[k] = list(v.values())
             val = {'time_idx_ordinate': ordin, 'time_idx': dates, 'BCName': {BCN: events}}  
         elif var=='Metadata' and 'Metadata' in str(file):
-            dur = int(str(file).split('_')[3].replace('Dur', ''))
+            dur = int(str(file).split('_')[2].replace('Dur', ''))
             with open(outputs_dir/file) as f:
                 md =  json.load(f)
             val = {'BCName': {BCN: md}}

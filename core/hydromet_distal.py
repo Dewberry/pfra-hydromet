@@ -59,15 +59,13 @@ def main(md: dict, weights_dic: dict, durations: list, mainBCN: str, CN: int,
         fitted_cn = find_optimal_curve_beta_dist_S(df_CN)
         fnbase = 'Dur{0}_tempE{1}_convE{2}_volE{3}'.format(idur, tempE, 
                                                                 convE, volE)
-        fn_CN = "Rand_CN_distal_{0}_{1}_Se{2}.csv".format(distalBCN, fnbase,
-                                                                        seed)
+        fn_CN = "Rand_CN_{0}_{1}_Se{2}.csv".format(distalBCN, fnbase, seed)
         random_cns = RandomizeData(fitted_cn, nevents, outputs_dir, 
                 fn_CN, seed = seed, variable = 'CN', display_print = False)
         cum_excess, final_precip, incr_excess = calc_excess_rainfall(eventID, 
                                 precip, random_cns, idur, adjust_CN_less24)
         final_curves = calc_mean_curves(groups, incr_excess) 
-        fn_Excess = 'Excess_Rainfall_distal_{0}_{1}.csv'.format(distalBCN,
-                                                                     fnbase) 
+        fn_Excess = 'Excess_Rainfall_{0}_{1}.csv'.format(distalBCN, fnbase) 
         final_curves.to_csv(outputs_dir/fn_Excess)
         outfiles.append(fn_Excess)
         dic_metadata = {}
@@ -96,7 +94,7 @@ def main(md: dict, weights_dic: dict, durations: list, mainBCN: str, CN: int,
         for col in df.columns:
               updated_metadata[col] = df[col].to_dict()  
         dic_metadata['events_metadata'] = updated_metadata
-        fn_MD = 'Metadata_distal_{0}_{1}.json'.format(distalBCN, fnbase)
+        fn_MD = 'Metadata_{0}_{1}.json'.format(distalBCN, fnbase)
         with open(outputs_dir/fn_MD, 'w') as f:
               json.dump(dic_metadata, f)
         outfiles.append(fn_MD)
@@ -108,8 +106,7 @@ def main(md: dict, weights_dic: dict, durations: list, mainBCN: str, CN: int,
     excess_dic = combine_distal_results(outfiles, outputs_dir, 'Excess',
                                         distalBCN, ordin = time_idx_ordinate, 
                                         remove_ind_dur = remove_intermediates)
-    fn_final = '{0}_{1}_{2}_distal'.format(Project_Area, Pluvial_Model,
-                                                                    distalBCN)
+    fn_final = '{0}_{1}_{2}'.format(Project_Area, Pluvial_Model, distalBCN)
     with open(outputs_dir/'{0}.json'.format(fn_final),'w') as f:
         json.dump(excess_dic, f)     
     metadata = combine_distal_results(outfiles, outputs_dir, 'Metadata', 
