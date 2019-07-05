@@ -1369,9 +1369,9 @@ def get_lateral_inflow_domains(pluvial_params_dir: plib, BCN: str,
     return lid
 
 
-def combine_results(var: str, outputs_dir: str, AOI: str, 
-            durations: list, tempEpsilon_dic: dict, convEpsilon_dic: dict, 
-    volEpsilon_dic: dict, BCN: str=None, remove_ind_dur: bool = True) -> dict:
+def combine_results(var: str, outputs_dir: str, BCN: str, durations: list,
+        tempEpsilon_dic: dict, convEpsilon_dic: dict, volEpsilon_dic: dict,
+         		run_dur_dic: dict=None, remove_ind_dur: bool = True) -> dict:
     '''Combines the excess rainfall *.csv files for each duration into a 
        single dictionary for all durations.
     '''
@@ -1382,7 +1382,7 @@ def combine_results(var: str, outputs_dir: str, AOI: str,
         tE = tempEpsilon_dic[str(dur)]
         cE = convEpsilon_dic[str(dur)]
         vE = volEpsilon_dic[str(dur)]
-        scen='{0}_Dur{1}_tempE{2}_convE{3}_volE{4}'.format(AOI, dur, tE, cE, vE)
+        scen='{0}_Dur{1}_tempE{2}_convE{3}_volE{4}'.format(BCN, dur, tE, cE, vE)
         file = outputs_dir/'{}_{}.csv'.format(var, scen)
         df = pd.read_csv(file, index_col = 0)
         if var == 'Excess_Rainfall':
@@ -1394,8 +1394,11 @@ def combine_results(var: str, outputs_dir: str, AOI: str,
                 if 'E' in k:
                     events[k] = list(v.values())
             key ='H{0}'.format(str(dur).zfill(2))
-            val = {'time_idx_ordinate': ordin, 'time_idx': dates, 
-                    'pluvial_BC_units': 'inch/ts', 'BCName': {BCN: events}}         
+            val = {'time_idx_ordinate': ordin, 
+                   'run_duration_days': run_dur_dic[dur],
+                    'time_idx': dates, 
+                    'pluvial_BC_units': 'inch/ts', 
+                    'BCName': {BCN: events}}         
             dic[key] = val
         elif var == 'Weights':
             df_lst.append(df)
@@ -1433,7 +1436,8 @@ def combine_metadata(outputs_dir: str, AOI: str, durations: list,
     
 
 def combine_distal_results(outfiles: list, outputs_dir: plib, var: str, 
-			BCN: str, ordin: str='Hours', remove_ind_dur: bool=True) -> dict:
+						BCN: str, ordin: str='Hours', run_dur_dic: dict=None,
+			 							remove_ind_dur: bool=True) -> dict:
     '''Combines the excess rainfall results and metadata for each duration 
        into a single file for all durations.
     '''
@@ -1448,7 +1452,9 @@ def combine_distal_results(outfiles: list, outputs_dir: plib, var: str,
             for k, v in df_dic.items():
                 if 'E' in k:
                     events[k] = list(v.values())
-            val = {'time_idx_ordinate': ordin, 'time_idx': dates, 'BCName': {BCN: events}}  
+            val = {'time_idx_ordinate': ordin, 
+                   'run_duration_days': run_dur_dic[dur],
+                   'time_idx': dates, 'BCName': {BCN: events}}  
         elif var=='Metadata' and 'Metadata' in str(file):
             dur = int(str(file).split('_')[2].replace('Dur', ''))
             with open(outputs_dir/file) as f:

@@ -4,9 +4,9 @@ from hydromet import*
 #---------------------------------------------------------------------------#
 def main(md: dict, weights_dic: dict, durations: list, mainBCN: str, CN: int, 
     arc_data: dict, Project_Area: str,  Pluvial_Model: str, distalBCN: str, 
-    outputs_dir: plib, time_idx_ordinate: str, adjust_CN_less24: bool=False, 
-                    remove_intermediates: bool=True, display_print: bool=True, 
-                                                    plot: bool=True) -> None:
+                outputs_dir: plib, time_idx_ordinate: str, run_dur_dic: dict, 
+                adjust_CN_less24: bool=False, remove_intermediates: bool=True, 
+                          display_print: bool=True, plot: bool=True) -> None:
     '''Extracts data from the metadata dictionary, calculates random curve 
        numbers, performs the excess rainfall calculation, groups the events,
        saves the grouped incremental excess rainfall and metadata, and plots
@@ -16,14 +16,25 @@ def main(md: dict, weights_dic: dict, durations: list, mainBCN: str, CN: int,
        ----------
        md: metadata dictionary which contains the metadata for the 
            precipitation events that were generated in EventsTable.ipynb.
-       dur: the event durations as a list, i.e ['H06', 'H12', ...]
-       name: the boundary condition name as a string.
-       CN: the user-specified curve number as an integer.
+       weights_dic: weights dictionary which contains the weight of each curve
+                    group in each duration.
+       durations: the event durations as a list, i.e ['H06', 'H12', ...]
+       mainBCN: the main domain naem as a string. This is the domain used to
+                calculate the metadata contained with the metadata dictionary. 
+       CN: the curve number for the distal domain as an integer.
        arc_data: a dictionary containing the AMCI and AMCIII values for the
                  specified curve number.
-       distalBCN: Name of the area of interest as a string.
+       Project_Area: project area name as a string.
+       Pluvial_Model: name of the pluvial model as a string.
+       distalBCN: the distal domain name as string. This is the domain whose
+                  excess rainfall events are to be calculated using the 
+                  provided curve number. 
        outputs_dir: The path for saving the outputs, including intermediate
-                    and final results
+                    and final results.
+       time_idx_ordinate: The ordinate of the time index, i.e. minutes, 
+                          hours, days, etc.
+       run_dur_dic: dictionary containing the run duration for each event
+                    duration.
        adjust_CN_less24: Bool specifying whether to adjust the curve number
                          when the storm duration is less than 24 hours.
        remove_intermediates: Bool specifying whether to remove the 
@@ -104,14 +115,12 @@ def main(md: dict, weights_dic: dict, durations: list, mainBCN: str, CN: int,
               plot_grouped_curves(final_curves, y_max) 
     outfiles = extract_list(outfiles)
     excess_dic = combine_distal_results(outfiles, outputs_dir, 'Excess',
-                                        distalBCN, ordin = time_idx_ordinate, 
-                                        remove_ind_dur = remove_intermediates)
+            distalBCN, time_idx_ordinate, run_dur_dic, remove_intermediates)
     fn_final = '{0}_{1}_{2}'.format(Project_Area, Pluvial_Model, distalBCN)
     with open(outputs_dir/'{0}.json'.format(fn_final),'w') as f:
         json.dump(excess_dic, f)     
     metadata = combine_distal_results(outfiles, outputs_dir, 'Metadata', 
-                                        distalBCN, ordin = time_idx_ordinate, 
-                                        remove_ind_dur = remove_intermediates)
+        distalBCN, time_idx_ordinate, remove_ind_dur = remove_intermediates)
     with open(outputs_dir/'{0}_Metadata.json'.format(fn_final),'w') as f:
         json.dump(metadata, f)   
     if plot: 
