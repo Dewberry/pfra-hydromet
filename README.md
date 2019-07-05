@@ -39,7 +39,12 @@ __NOTE__: [EventsTable](EventsTable.ipynb) is currently the primary notebook for
 - [__Convolution_Parameters__](Convolution_Parameters.ipynb): Describes the test statistic and parameters used during the convolution step in the `EventsTable` notebook.
 
 
-##### DataRepository:
+##### Notebooks:
+
+-`ProjectArea_ModelName_Pluvial_Parameters.xlsx `: Excel Workbook used to store the CN, stormwater removal rate and capacity, and information on lateral inflow domains for each pluvial domain within a pluvial model. This Workbook is called by `EventsTable`, `PM-EventsTable`, `distalEventsTable`, and `reEventsTable`.
+
+
+##### __DataRepository__:
 
 - __Temporal_Distributions__: Folder containing csv files of temporal distributions of observed rainfall patterns broken down by volume, region, duration, and quartile [NOAA Published](https://hdsc.nws.noaa.gov/hdsc/pfds/pfds_temporal.html). Note that the original data were compiled into csv's for uniform formatting.
 
@@ -65,16 +70,16 @@ __NOTE__: [EventsTable](EventsTable.ipynb) is currently the primary notebook for
 1. Run [PrecipTable](PrecipTable.ipynb) in order to calculate the area-averaged precipitation frequency table for the specified durations as well as to determine the NOAA Atlas 14 volume and region.
     ```
       Inputs:
-        1. A vector polygon of the area of interest
+        1. A vector polygon of the area of interest, i.e. the pluvial domain.
         2. Optional/as needed: 
-            - Precipitaiton event durations, the standard are 6, 12, 24, and 96 hour.
-            - The polygon's projection if it can not be determined automatically
+            - Precipitation event durations; the standard  durations are 6, 12, 24, and 96 hour.
+            - The polygon's projection as a string if it cannot be determined automatically.
       Outputs:
-        1. A spreadsheet with the area-averaged precipitation frequency table for each duration and a sheet with the NOAA Atlas 14 volume and region numbers.
+        1. A spreadsheet with the area-averaged precipitation frequency table for each duration, along with the NOAA Atlas 14 volume and region numbers.
     ```
     
     
-2. Run [PM-EventsTable](PM-EventsTable.ipynb) which executes [EventsTable](EventsTable.ipynb) in order to calculate excess rainfall events and [reEventsTable](reEventsTable.ipynb) to perform the stormwater reduction if desired.
+2. Run [PM-EventsTable](PM-EventsTable.ipynb) which executes [EventsTable](EventsTable.ipynb) in order to calculate excess rainfall events and [reEventsTable](reEventsTable.ipynb) to perform the stormwater reduction (optional).
 
     ```
       Inputs:
