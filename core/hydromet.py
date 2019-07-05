@@ -1395,7 +1395,7 @@ def combine_results(var: str, outputs_dir: str, BCN: str, durations: list,
                     events[k] = list(v.values())
             key ='H{0}'.format(str(dur).zfill(2))
             val = {'time_idx_ordinate': ordin, 
-                   'run_duration_days': run_dur_dic[dur],
+                   'run_duration_days': run_dur_dic[str(dur)],
                     'time_idx': dates, 
                     'pluvial_BC_units': 'inch/ts', 
                     'BCName': {BCN: events}}         
@@ -1453,7 +1453,7 @@ def combine_distal_results(outfiles: list, outputs_dir: plib, var: str,
                 if 'E' in k:
                     events[k] = list(v.values())
             val = {'time_idx_ordinate': ordin, 
-                   'run_duration_days': run_dur_dic[dur],
+                   'run_duration_days': run_dur_dic[str(dur)],
                    'time_idx': dates, 'BCName': {BCN: events}}  
         elif var=='Metadata' and 'Metadata' in str(file):
             dur = int(str(file).split('_')[2].replace('Dur', ''))
@@ -1742,9 +1742,10 @@ def plot_lateral_inflow_hydro(ReducedTable: dict, durations: list, BCN: str,
 
 
 def plot_amount_vs_weight(weights_dic: dict, excess_dic: dict, mainBCN: str,
-									distalBCN: str='mainBCN') -> plt.subplots:
+									distalBCN: str=None) -> plt.subplots:
     '''Plot the total excess rainfall for each event versus its weight.
     '''
+    if distalBCN==None: distalBCN=mainBCN
     fig, ax = plt.subplots(1,1, figsize=(24,5))
     n = 0
     for dur in excess_dic.keys():
@@ -1760,7 +1761,7 @@ def plot_amount_vs_weight(weights_dic: dict, excess_dic: dict, mainBCN: str,
     ax.set_title('Excess Rainfall Amount Versus Event Weight '
                                                     '({} Events)'.format(n))
     ax.grid()
-    ax.legend()    
+    ax.legend()   
 
 
 def plot_tempEpsilons(events: pd.DataFrame, event_of_interest: str, 
