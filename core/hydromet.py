@@ -1412,9 +1412,9 @@ def combine_results(var: str, outputs_dir: str, BCN: str, durations: list,
     return dic
     
 
-def combine_metadata(outputs_dir: str, AOI: str, durations: list, 
-        tempEpsilon_dic: dict, convEpsilon_dic: dict, volEpsilon_dic: dict, 
-                            BCN: str, remove_ind_dur: bool = True) -> dict:
+def combine_metadata(outputs_dir: str, BCN: str, durations: list, 
+        tempEpsilon_dic: dict, convEpsilon_dic: dict, volEpsilon_dic: dict,
+                                        remove_ind_dur: bool = True) -> dict:
     '''Combines the metadata files for each duration into a single file for
        all durations.
     '''
@@ -1423,7 +1423,7 @@ def combine_metadata(outputs_dir: str, AOI: str, durations: list,
         tE = tempEpsilon_dic[str(dur)]
         cE = convEpsilon_dic[str(dur)]
         vE = volEpsilon_dic[str(dur)]
-        scen='{0}_Dur{1}_tempE{2}_convE{3}_volE{4}'.format(AOI, dur, tE, cE, vE)
+        scen='{0}_Dur{1}_tempE{2}_convE{3}_volE{4}'.format(BCN, dur, tE, cE, vE)
         file = outputs_dir/'Metadata_{0}.json'.format(scen)  
         with open(file) as f:
             md =  json.load(f)

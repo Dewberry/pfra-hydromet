@@ -30,7 +30,7 @@ __NOTE__: [EventsTable](EventsTable.ipynb) is currently the primary notebook for
 
 - [__EventsTable__](EventsTable.ipynb): Calculates excess rainfall using area-averaged NOAA Atlas 14 precipitation data, temporal distributions, and the curve number (CN)* transform. The output is a set of unique, weighted excess rainfall time series.
 
-- [__reEventsTable__](reEventsTable.ipynb): Calculates the reduced excess rainfall given a user-specified stormwater removal rate and capacity. 
+- [__reEventsTable__](reEventsTable.ipynb): Calculates the reduced excess rainfall given a user-specified stormwater removal rate and capacity. Given user-specified contributing areas (stormsheds), the lateral inflow hydrograhs are also calculated for each event.
 
 - [__distalEventsTable__](distalEventsTable.ipynb): Calculates excess rainfall using updated randomized curve numbers and the original precipitation events calculated in `EventsTable.ipynb`. The events are combined using the groups determined during the convolution steps in `EventsTable.ipynb`. The `reEventsTable` notebook can be then be executed in order to calculate the reduced excess rainfall.
 
@@ -74,13 +74,12 @@ __NOTE__: [EventsTable](EventsTable.ipynb) is currently the primary notebook for
     ```
     
     
-2. Run [PM-EventsTable](PM-EventsTable.ipynb) Create runoff time-series events for hydraulic simulation
+2. Run [PM-EventsTable](PM-EventsTable.ipynb) which executes [EventsTable](EventsTable.ipynb) in order to calculate excess rainfall events and [reEventsTable](reEventsTable.ipynb) to perform the stormwater reduction if desired.
 
     ```
       Inputs:
-        1. Precipitation spreadsheet (calculated in step 1)
-        2. Curve number for the AOI
-        3. NOAA Atlas 14 volume number
+        1. PrecipTable.xlsx from step 1, which contains precipitation frequency tables and the NOAA Atlas 14 volume and region number. Note that the volume and region number may also be entered manually.
+        2. Pluvial_Parameters.xlsx metadata file which contains the curve number and information on the stormwater infrastructure.
         4. Storm durations
         5. Filenames and paths for outputs
         6. EventsTable.ipynb
