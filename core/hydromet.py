@@ -1257,14 +1257,15 @@ def checkif_SWinfra(pluvial_params_dir: plib, BCN: str,
 
 
 def get_stormwater_rate_cap(pluvial_params_dir: plib, BCN: str, 
-                                        display_print: bool=True) -> list:
+	SW_rate_col: str='SW Rate (in/30min)', SW_cap_col: str='SW Capacity (in)',  
+											display_print: bool=True) -> list:
     '''Extract the stormwater removal rate and capacity from the pluvial 
        parameters Excel Workbook for the specified boundary condition name. 
     '''
     df = pd.read_excel(pluvial_params_dir, sheet_name = 'Pluvial_Domain')
     pp = df[df['Pluvial Domain']==BCN]
-    rate = pp['SW Rate (in/30min)'].values[0]
-    maxcap = pp['SW Capacity (in/unit area)'].values[0]
+    rate = pp[SW_rate_col].values[0]
+    maxcap = pp[SW_cap_col].values[0]
     rate_cap = [rate, maxcap]
     if display_print: 
         print(display(pp.head(2)))
