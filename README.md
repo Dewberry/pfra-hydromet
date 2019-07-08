@@ -39,7 +39,7 @@ __NOTE__: [EventsTable](EventsTable.ipynb) is currently the primary notebook for
 - [__Convolution_Parameters__](Convolution_Parameters.ipynb): Describes the test statistic and parameters used during the convolution step in the `EventsTable` notebook.
 
 
-##### Notebooks:
+##### Control File:
 
 -`ProjectArea_ModelName_Pluvial_Parameters.xlsx `: Excel Workbook used to store the CN, stormwater removal rate and capacity, and information on lateral inflow domains for each pluvial domain within a pluvial model. This Workbook is called by `EventsTable`, `PM-EventsTable`, `distalEventsTable`, and `reEventsTable`.
 
