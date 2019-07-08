@@ -184,6 +184,19 @@ def get_input_data(precip_table_dir: str, duration: int, lower_limit: int=2,
     return df_truncated
 
 
+def get_volume_region(precip_table_dir: str, vol_col: str='Volume', 
+                    reg_col: str='Region', display_print: bool=True) -> list:
+    '''Extracts the NOAA Atlas 14 volume and region from the Excel file 
+       created by PrecipTable.ipynb
+    '''
+    df = pd.read_excel(precip_table_dir, sheet_name = 'NOAA_Atlas_MetaData')
+    vol =df[vol_col][0]
+    reg = df[reg_col][0]
+    results = [vol, reg]
+    if display_print: print('NOAA Atlas 14: Volume {}, Region {}'.format(vol, reg))
+    return results
+
+
 def get_temporal_map(data_dir: str, filename: str, vol: int, reg: int, 
                                 dur: int, display_print: bool=True) -> dict:
     '''Reads the json file containing the temporal distribution data metadata
@@ -248,6 +261,18 @@ def get_duration_weight(data_dir: str, filename: str, vol: int, reg: int,
     w=df[(df.index==dur)  & (df['Region']==reg)]['Duration Weight'].values[0]  
     if display_print: print(w)
     return w
+
+
+def get_CN(pluvial_params_dir: str, BCN: str, 
+                                            display_print: bool=True) -> int:
+    '''Extracts the curve number for the specified area of interest from the
+       pluvial parameters table. 
+    '''
+    df = pd.read_excel(pluvial_params_dir, sheet_name = 'Pluvial_Domain')
+    pp = df[df['Pluvial Domain']==BCN]
+    if display_print: print(display(pp))
+    CN = int(np.round((pp['Curve Number'].values[0])))
+    return CN
 
 
 def get_CN_distribution(data_dir: str, filename: str, 
@@ -785,17 +810,21 @@ def convert_tempEpsilon(tempEpsilon: float, incr_excess: pd.DataFrame) -> int:
 
 
 def bin_sorting_dev(incr_excess: pd.DataFrame, nbins: int, 
-                                        display_print: bool = True) -> list:
+                min_thresh: float=0.01, display_print: bool = True) -> list:
     '''Computes the histogram of the series data with the specified number
        of bins and returns the results as a list.
     '''
     runoff_data= incr_excess.sum()
-    hist_data = np.histogram(runoff_data, bins=nbins)
+    runoff_data_0 = runoff_data[runoff_data<min_thresh]
+    runoff_data_non0 = runoff_data[runoff_data>=min_thresh]
+    hist_data = np.histogram(runoff_data_non0, bins=50)
     bins = hist_data[1]
     binCount = hist_data[0]
     binData = dict(zip(binCount, bins))
     binData.pop(0, None)# Drop the last zero
     binData = sorted(binData.items(), key=operator.itemgetter(1))
+    n_zero = len(runoff_data_0)
+    if n_zero > 0: binData = [(n_zero, 0.0)]+binData
     if display_print: print(display(binData))
     return binData
 
@@ -871,14 +900,19 @@ def test_stat(c_df: pd.DataFrame, nc_df: pd.DataFrame, c: str, nc: str,
        Note that in this function's code, "c" and "nc" refer to "column" 
        and "next column", respectively.
     '''
-    perc_dif = abs(c_df[c]-nc_df[nc])/((c_df[c]+nc_df[nc])/2.0)*100.0
-    max_perc_dif = perc_dif.max() 
-    total_dif = abs(c_df[c].sum()-nc_df[nc].sum())
-    total_sum = c_df[c].sum()+nc_df[nc].sum()
-    perc_dif_total = total_dif/(total_sum/2.0)*100.0 
-    st1 = (convEpsilon-max_perc_dif)/convEpsilon
-    st2 = (volEpsilon-perc_dif_total)/volEpsilon
-    test = np.round(1 - np.sqrt((st1-1)**2+(st2-1)**2), 6)
+    dif = abs(c_df[c]-nc_df[nc])
+    avg = (c_df[c]+nc_df[nc])/2.0
+    if all(x==0.0 for x in avg):
+        test = 1.0
+    else:   
+        perc_dif = dif/avg*100.0
+        max_perc_dif = perc_dif.max() 
+        total_dif = abs(c_df[c].sum()-nc_df[nc].sum())
+        total_sum = c_df[c].sum()+nc_df[nc].sum()
+        perc_dif_total = total_dif/(total_sum/2.0)*100.0     
+        st1 = (convEpsilon-max_perc_dif)/convEpsilon
+        st2 = (volEpsilon-perc_dif_total)/volEpsilon
+        test = np.round(1 - np.sqrt((st1-1)**2+(st2-1)**2), 6)
     return test
 
 
@@ -1209,6 +1243,37 @@ def extract_event_metadata(outfiles: list, events_metadata: dict,
     return metadata
 
 
+def checkif_SWinfra(pluvial_params_dir: plib, BCN: str, 
+                                            display_print: bool=True) -> str:
+    '''Check the pluvial parameters Excel Workbook to determine if the 
+       specified pluvial domain has stormwater infrastructure.
+    '''
+    df = pd.read_excel(pluvial_params_dir, sheet_name = 'Pluvial_Domain')
+    pp = df[df['Pluvial Domain']==BCN]
+    run_reduced = pp['SW Infrastructure (YES or NO)'].values[0]
+    if display_print: 
+        print('Is there stormwater infrastructure? ->', run_reduced)
+    return run_reduced
+
+
+def get_stormwater_rate_cap(pluvial_params_dir: plib, BCN: str, 
+	SW_rate_col: str='SW Rate (in/30min)', SW_cap_col: str='SW Capacity (in)',  
+											display_print: bool=True) -> list:
+    '''Extract the stormwater removal rate and capacity from the pluvial 
+       parameters Excel Workbook for the specified boundary condition name. 
+    '''
+    df = pd.read_excel(pluvial_params_dir, sheet_name = 'Pluvial_Domain')
+    pp = df[df['Pluvial Domain']==BCN]
+    rate = pp[SW_rate_col].values[0]
+    maxcap = pp[SW_cap_col].values[0]
+    rate_cap = [rate, maxcap]
+    if display_print: 
+        print(display(pp.head(2)))
+        print('SW Rate: {0} in/30min\nSW Capacity: {1} in/unit '
+                                                'area'.format(rate, maxcap))
+    return rate_cap
+
+
 def determine_timestep(dic_dur: dict, display_print: bool=True) -> float:
     '''Calculates the timestep of the rainfall excess data contained within
        the passed dictionary.
@@ -1265,9 +1330,49 @@ def reduced_excess(event: list, adj_rate: float, max_capacity: float) -> list:
     return reduced_event
 
 
-def combine_results(var: str, outputs_dir: str, AOI: str, 
-            durations: list, tempEpsilon_dic: dict, convEpsilon_dic: dict, 
-    volEpsilon_dic: dict, BCN: str=None, remove_ind_dur: bool = True) -> dict:
+def calc_lateral_inflow_hydro(lid: pd.DataFrame, ReducedTable: dict, 
+                            StormwaterTable: dict, durations: list, BCN: str, 
+                        display_print: bool=True, display_plots: bool=True, 
+                                                plot_lid_num: int=0) -> dict:
+    '''Calculate the lateral inflow hydrographs for each event and domain 
+       given the lateral inflow contributing area.
+    '''
+    lid_names = list(lid['Lateral Inflow Domain'])
+    if display_print: print('Lateral Inflow Domains:', lid_names)
+    for dur in durations:
+        ReducedTable[dur]['lateral_BC_units'] = 'cfs'
+        ts = determine_timestep(StormwaterTable[dur], display_print=False)
+        events_dic = StormwaterTable[dur]['BCName'][BCN]
+        for l in lid_names:
+            slicedf = lid[lid['Lateral Inflow Domain']==l]
+            a_sqmile = slicedf['Lateral Inflow Area (miles^2)'].values[0]
+            a_sqft = a_sqmile*5280.0**2
+            li_dic = {}
+            for k, v in events_dic.items():
+                Q_per_ts = [(x/12.0)*a_sqft for x in v]
+                li_dic[k] = [x/(ts*60.0*60.0) for x in Q_per_ts]
+                ReducedTable[dur]['BCName'][l] = li_dic
+    l = lid_names[plot_lid_num]
+    if display_plots: 
+        plot_lateral_inflow_hydro(ReducedTable, durations, l)               
+    return ReducedTable
+
+
+def get_lateral_inflow_domains(pluvial_params_dir: plib, BCN: str, 
+                                display_print: bool=True) -> pd.DataFrame:
+    '''Load the pluvial parameters Excel Worksheet and extract the later 
+       inflow domains corresponding with the specified boundary condition 
+       name.
+    '''
+    df=pd.read_excel(pluvial_params_dir, sheet_name = 'Lateral_Inflow_Domain')
+    lid = df[df['Pluvial Domain']==BCN].copy(deep=True)
+    if display_print: print(display(lid.head(2)))
+    return lid
+
+
+def combine_results(var: str, outputs_dir: str, BCN: str, durations: list,
+        tempEpsilon_dic: dict, convEpsilon_dic: dict, volEpsilon_dic: dict,
+         		run_dur_dic: dict=None, remove_ind_dur: bool = True) -> dict:
     '''Combines the excess rainfall *.csv files for each duration into a 
        single dictionary for all durations.
     '''
@@ -1278,7 +1383,7 @@ def combine_results(var: str, outputs_dir: str, AOI: str,
         tE = tempEpsilon_dic[str(dur)]
         cE = convEpsilon_dic[str(dur)]
         vE = volEpsilon_dic[str(dur)]
-        scen='{0}_Dur{1}_tempE{2}_convE{3}_volE{4}'.format(AOI, dur, tE, cE, vE)
+        scen='{0}_Dur{1}_tempE{2}_convE{3}_volE{4}'.format(BCN, dur, tE, cE, vE)
         file = outputs_dir/'{}_{}.csv'.format(var, scen)
         df = pd.read_csv(file, index_col = 0)
         if var == 'Excess_Rainfall':
@@ -1290,7 +1395,11 @@ def combine_results(var: str, outputs_dir: str, AOI: str,
                 if 'E' in k:
                     events[k] = list(v.values())
             key ='H{0}'.format(str(dur).zfill(2))
-            val = {'time_idx_ordinate': ordin, 'time_idx': dates, 'BCName': {BCN: events}}         
+            val = {'time_idx_ordinate': ordin, 
+                   'run_duration_days': run_dur_dic[str(dur)],
+                    'time_idx': dates, 
+                    'pluvial_BC_units': 'inch/ts', 
+                    'BCName': {BCN: events}}         
             dic[key] = val
         elif var == 'Weights':
             df_lst.append(df)
@@ -1304,9 +1413,9 @@ def combine_results(var: str, outputs_dir: str, AOI: str,
     return dic
     
 
-def combine_metadata(outputs_dir: str, AOI: str, durations: list, 
-        tempEpsilon_dic: dict, convEpsilon_dic: dict, volEpsilon_dic: dict, 
-                            BCN: str, remove_ind_dur: bool = True) -> dict:
+def combine_metadata(outputs_dir: str, BCN: str, durations: list, 
+        tempEpsilon_dic: dict, convEpsilon_dic: dict, volEpsilon_dic: dict,
+                                        remove_ind_dur: bool = True) -> dict:
     '''Combines the metadata files for each duration into a single file for
        all durations.
     '''
@@ -1315,7 +1424,7 @@ def combine_metadata(outputs_dir: str, AOI: str, durations: list,
         tE = tempEpsilon_dic[str(dur)]
         cE = convEpsilon_dic[str(dur)]
         vE = volEpsilon_dic[str(dur)]
-        scen='{0}_Dur{1}_tempE{2}_convE{3}_volE{4}'.format(AOI, dur, tE, cE, vE)
+        scen='{0}_Dur{1}_tempE{2}_convE{3}_volE{4}'.format(BCN, dur, tE, cE, vE)
         file = outputs_dir/'Metadata_{0}.json'.format(scen)  
         with open(file) as f:
             md =  json.load(f)
@@ -1327,35 +1436,37 @@ def combine_metadata(outputs_dir: str, AOI: str, durations: list,
     return dic   
     
 
-def combine_distal_results(outfiles: list, var: str, BCN: list, 
-                        ordin: str='Hours', remove_ind_dur: bool=True) -> dict:
+def combine_distal_results(outfiles: list, outputs_dir: plib, var: str, 
+						BCN: str, ordin: str='Hours', run_dur_dic: dict=None,
+			 							remove_ind_dur: bool=True) -> dict:
     '''Combines the excess rainfall results and metadata for each duration 
        into a single file for all durations.
     '''
-    assert len(BCN)==1, 'Update function to handle multiple boundary conditions'
     dic = {}
     for file in outfiles:
-        if var=='Excess' and 'Excess' in str(file):
-            dur = int(str(file).split('_')[4].replace('Dur', ''))
-            df = pd.read_csv(file, index_col = 0)
+        if var == 'Excess' and 'Excess' in str(file):
+            dur = int(str(file).split('_')[3].replace('Dur', ''))
+            df = pd.read_csv(outputs_dir/file, index_col = 0)
             df_dic = df.to_dict()
             dates = list(df.index)
             events = {}
             for k, v in df_dic.items():
                 if 'E' in k:
                     events[k] = list(v.values())
-            val = {'time_idx_ordinate': ordin, 'time_idx': dates, 'BCName': {BCN[0]: events}}  
+            val = {'time_idx_ordinate': ordin, 
+                   'run_duration_days': run_dur_dic[str(dur)],
+                   'time_idx': dates, 'BCName': {BCN: events}}  
         elif var=='Metadata' and 'Metadata' in str(file):
-            dur = int(str(file).split('_')[3].replace('Dur', ''))
-            with open(file) as f:
+            dur = int(str(file).split('_')[2].replace('Dur', ''))
+            with open(outputs_dir/file) as f:
                 md =  json.load(f)
-            val = {'BCName': {BCN[0]: md}}
+            val = {'BCName': {BCN: md}}
         else:
             continue        
         key ='H{0}'.format(str(dur).zfill(2))
         dic[key] = val
         if remove_ind_dur:
-             os.remove(file)
+             os.remove(outputs_dir/file)
     return dic
 
 
@@ -1410,18 +1521,18 @@ def plot_area_of_interest(geo_df: geoDF, select_data: str,
 
 
 def plot_aoi_noaa_intersection(intersection_gdf: geoDF, 
-											select_data: str) -> plt.subplots:
-	'''Plots the intersection of the geodataframe and the NOAA Atlas 14 
-	   volumes and regions.
-	'''
-	intersection_gdf['Volume_Region'] = 'Volume: ' +\
+                                            select_data: str) -> plt.subplots:
+    '''Plots the intersection of the geodataframe and the NOAA Atlas 14 
+       volumes and regions.
+    '''
+    intersection_gdf['Volume_Region'] = 'Volume: ' +\
                         intersection_gdf['Volume'].map(str) + ', Region: ' +\
-                                            intersection_gdf['Region'].map(str)
-	fig = intersection_gdf.plot(column='Volume_Region', categorical=True, 
-												figsize=(10, 14), legend=True)
-	fig.set_title('Area of Interest (ID: {}) by NOAA Atlas' 
-												'Region'.format(select_data))
-	fig.grid()
+                                        intersection_gdf['Region'].map(str)
+    fig = intersection_gdf.plot(column='Volume_Region', categorical=True, 
+                                                figsize=(10, 14), legend=True)
+    fig.set_title('Area of Interest (ID: {}) by NOAA Atlas' 
+                                                'Region'.format(select_data))
+    fig.grid()
 
 
 
@@ -1471,8 +1582,8 @@ def plot_deciles_by_quartile(curve_group: dict, qrank: list,
     axis_num=[[0,0], [0,1], [1,0], [1,1]]
     for i, val in enumerate(qmap['map'].keys()):
         for col in curve_group[val].columns:
-            plt.suptitle('Volume '+str(vol)+' Region '+str(reg)+' Duration '+str(dur),
-                                        fontsize = 20, x  = 0.507, y = 1.02)
+            plt.suptitle('Volume '+str(vol)+' Region '+str(reg)+' Duration '+\
+                                str(dur), fontsize = 20, x  = 0.507, y = 1.02)
             ax[axis_num[i][0],axis_num[i][1]].plot(curve_group[val][col], 
                                                                 label=col) 
             ax[axis_num[i][0],axis_num[i][1]].grid()
@@ -1572,8 +1683,8 @@ def plot_grouped_curves(final_curves: dict, y_max: float,
 def plot_reduced_excess(ReducedTable: dict, EventsTable: dict, 
                     durations: list, selected_BCN: str, subplot_len: int=4, 
                                     title_adj: float=0.008) -> plt.subplot:
-    '''Plot the excess rainfall and reduced excess rainfall for the first two
-       events of each duration within the passed dictionaries.
+    '''Plot the excess rainfall and reduced excess rainfall for the first and
+       last events of each duration within the passed dictionaries.
     '''
     n = len(durations)
     fig, ax = plt.subplots(n, 1, figsize=(18, n*subplot_len+2))
@@ -1588,8 +1699,7 @@ def plot_reduced_excess(ReducedTable: dict, EventsTable: dict,
         dic_re = ReducedTable[dur]['BCName'][selected_BCN]
         dic_ex = EventsTable[dur]['BCName'][selected_BCN]
         keys =  list(dic_re.keys())
-        n_keys = len(keys)
-        sub_keys = [keys[0], keys[n_keys-1]]
+        sub_keys = [keys[0], keys[-1]]
         c = ['green', 'blue']
         for j, k in enumerate(sub_keys):
             ax_obj.plot(idx, dic_ex[k], linestyle = '-', label=k, color=c[j])        
@@ -1602,25 +1712,57 @@ def plot_reduced_excess(ReducedTable: dict, EventsTable: dict,
     fig.subplots_adjust(top=0.94+title_adj*(n-1))
 
 
-def plot_amount_vs_weight(weights_dic: dict, 
-                                excess_dic: dict, BCN: str) -> plt.subplots:
+def plot_lateral_inflow_hydro(ReducedTable: dict, durations: list, BCN: str, 
+                subplot_len: int=4, title_adj: float=0.008) -> plt.subplot:
+    '''Plot the lateral inflow hydrographs for the specified lateral inflow 
+       boundary for the first and last events of each duration.
+    '''
+    n = len(durations)
+    fig, ax = plt.subplots(n, 1, figsize=(18, n*subplot_len+2))
+    fig.suptitle( 'Lateral Inflow Hydrographs for {}'.format(BCN), size = 16)
+    for i, dur in enumerate(durations):
+        if n == 1: 
+            ax_obj = ax
+        else:
+            ax_obj = ax[i]
+        idx = ReducedTable[dur]['time_idx']
+        time_units = ReducedTable[dur]['time_idx_ordinate']
+        lih_units = ReducedTable[dur]['lateral_BC_units']
+        dic_re = ReducedTable[dur]['BCName'][BCN]
+        keys =  list(dic_re.keys())
+        sub_keys = [keys[0], keys[-1]]
+        c = ['green', 'blue']
+        for j, k in enumerate(sub_keys):
+            ax_obj.plot(idx, dic_re[k], linestyle = '-', label=k, color=c[j])        
+        ax_obj.set_xlabel('Time, [{}]'.format(time_units))
+        ax_obj.set_ylabel('Discharge, [{}]'.format(lih_units))
+        ax_obj.grid()
+        ax_obj.legend()
+    fig.tight_layout()
+    fig.subplots_adjust(top=0.94+title_adj*(n-1))
+
+
+def plot_amount_vs_weight(weights_dic: dict, excess_dic: dict, mainBCN: str,
+									distalBCN: str=None) -> plt.subplots:
     '''Plot the total excess rainfall for each event versus its weight.
     '''
+    if distalBCN==None: distalBCN=mainBCN
     fig, ax = plt.subplots(1,1, figsize=(24,5))
     n = 0
     for dur in excess_dic.keys():
         weight = []
         runoff = []
-        for k in excess_dic[dur]['BCName'][BCN].keys():
+        for k in excess_dic[dur]['BCName'][distalBCN].keys():
             n+=1
-            runoff.append(sum(excess_dic[dur]['BCName'][BCN][k]))
-            weight.append(weights_dic['BCName'][BCN][k])
+            runoff.append(sum(excess_dic[dur]['BCName'][distalBCN][k]))
+            weight.append(weights_dic['BCName'][mainBCN][k])
         ax.plot(weight, runoff, linestyle = '', marker = '.', label = dur)
     ax.set_xlabel('Event Weight, [-]')
     ax.set_ylabel('Excess Rainfall, [inches]')
-    ax.set_title('Excess Rainfall Amount Versus Event Weight ({} Events)'.format(n))
+    ax.set_title('Excess Rainfall Amount Versus Event Weight '
+                                                    '({} Events)'.format(n))
     ax.grid()
-    ax.legend()    
+    ax.legend()   
 
 
 def plot_tempEpsilons(events: pd.DataFrame, event_of_interest: str, 
