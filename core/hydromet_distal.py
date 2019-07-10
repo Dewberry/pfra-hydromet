@@ -19,7 +19,7 @@ def main(md: dict, weights_dic: dict, durations: list, mainBCN: str, CN: int,
        weights_dic: weights dictionary which contains the weight of each curve
                     group in each duration.
        durations: the event durations as a list, i.e ['H06', 'H12', ...]
-       mainBCN: the main domain naem as a string. This is the domain used to
+       mainBCN: the main domain name as a string. This is the domain used to
                 calculate the metadata contained with the metadata dictionary. 
        CN: the curve number for the distal domain as an integer.
        arc_data: a dictionary containing the AMCI and AMCIII values for the
@@ -45,7 +45,7 @@ def main(md: dict, weights_dic: dict, durations: list, mainBCN: str, CN: int,
    
        Returns
        -------
-       outfiles: A list of the path/filenames saved.
+       None
 
     '''
     outfiles = []

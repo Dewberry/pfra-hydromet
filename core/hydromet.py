@@ -1138,27 +1138,28 @@ def determine_tstep_units(incr_excess: pd.DataFrame) -> dict:
 
 def dss_map(outputs_dir: str, var: str, tstep: int, tstep_units: str,
                 units: str, dtype: str='INST-VAL', IMP: str='DSS_MAP.input', 
-                                        to_dss: str='ToDSS.input') -> None:
+                        to_dss: str='ToDSS.input', open_op: str='w') -> None:
     '''Creates a map file containing the data structure for DSSUTL.EXE.
     '''
     var8 = var[:8]
     ts = '{0}{1}'.format(tstep, tstep_units)
     output_file = outputs_dir/IMP
-    datastring = "EV {0}=///{0}//{1}// UNITS={2} TYPE={3}\nEF [APART] [BPART] [DATE] [TIME] [{0}]\nIMP {4}".format(var8, ts, units, dtype, to_dss)
-    with open(output_file, 'w') as f: 
+    datastring = "EV {0}=///{0}//{1}// UNITS={2} TYPE={3}\nEF [APART] [BPART] [DATE] [TIME] [{0}]\nIMP {4}\n".format(var8, ts, units, dtype, to_dss)
+    with open(output_file, open_op) as f: 
         f.write(datastring)
     return None
 
 
 def excess_df_to_input(outputs_dir: str, df: pd.DataFrame, tstep: float,
-        tstep_units: str, scen_name: str, to_dss: str='ToDSS.input') -> None:
+        				tstep_units: str, scen_name: str, open_op: str='w', 
+        								to_dss: str='ToDSS.input') -> None:
     '''Writes the excess rainfall dataframe to an input file according to the 
        struture specified within DSS_MAP.input.
     '''
     temp_data_file = outputs_dir/to_dss
     cols = df.columns.tolist()
-    start_date = datetime.combine(datetime.now().date(), datetime.min.time())
-    with open(temp_data_file, 'w') as f:
+    start_date = datetime(2000, 5, 1, 00, 00)
+    with open(temp_data_file, open_op) as f:
         for i, col in enumerate(cols):
             m_dtm = start_date
             event_data = df[col]
@@ -1174,14 +1175,15 @@ def excess_df_to_input(outputs_dir: str, df: pd.DataFrame, tstep: float,
     return None
 
 
-def make_dss_file(outputs_dir: str, bin_dir: str, dssutil: str, 
-                        dss_filename: str, IMP: str='DSS_MAP.input',
-                to_dss: str='ToDSS.input', remove_temp_files: bool=True, 
+def make_dss_file(outputs_dir: str, bin_dir: str, dss_filename: str,
+                        dssutil: str='DSSUTL.EXE', IMP: str='DSS_MAP.input', 
+                    to_dss: str='ToDSS.input', remove_temp_files: bool=True, 
                                         display_print: bool = True) -> None:
     '''Runs the DSSUTL executable using the DSS_MAP.input file to map the 
        excess rainfall data from the ToDSS.input file and saves the results
        to a dss file.
     '''
+    cwd = os.getcwd()
     shutil.copy(bin_dir/dssutil, outputs_dir)
     os.chdir(outputs_dir)
     os.system("{0} {1}.dss INPUT={2}".format(dssutil, dss_filename, IMP))
@@ -1191,6 +1193,7 @@ def make_dss_file(outputs_dir: str, bin_dir: str, dssutil: str,
         os.remove(outputs_dir/dssutil)
         os.remove(outputs_dir/to_dss)
     filepath = outputs_dir/dss_filename
+    os.chdir(cwd)
     if display_print: print('Dss File written to {0}.dss'.format(filepath))
     return None
 
