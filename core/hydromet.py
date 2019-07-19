@@ -53,6 +53,16 @@ plib = 'pathlib.Path'
 #---------------------------------------------------------------------------#
 
 
+def check_attributes(gdf: geoDF) -> None:
+    '''Checks the passed geodataframe to make sure that "Volume" and "Region"
+       are not attributes, else the intersect_temporal_areas function will 
+       fail. 
+    '''
+    assert 'Volume' and 'Region' not in list(gdf.columns), ('"Volume" and '
+        '"Region" cannot be columns in the vector polygon. Rename columns '
+        'and reload')
+
+
 def intersect_temporal_areas(geo_df: geoDF, datarepository_dir: plib, 
            Temporal_area_filename: str, alldata: bool=False) -> (dict, geoDF):
     '''Intersects the area of interest with the NOAA Atlas 14 volumes and 
