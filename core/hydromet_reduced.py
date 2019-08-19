@@ -40,7 +40,9 @@ def main(EventsTable: dict, durations: list, BCN: str,
     for d in durations:
         dic_dur = EventsTable[d]
         tord = dic_dur['time_idx_ordinate']
+        run_dur = dic_dur['run_duration_days']
         tidx = dic_dur['time_idx']
+        pluvial_BC_units = dic_dur['pluvial_BC_units']
         if display_print: print('Duration:', d)
         ts = determine_timestep(dic_dur, display_print)
         if rand_rate_cap:
@@ -66,8 +68,12 @@ def main(EventsTable: dict, durations: list, BCN: str,
             dic_stormwater[event] = list(np.array(unred)-np.array(red))
             dic_BCN[BCN] = dic_reduced
             dic_BCN_SW[BCN] = dic_stormwater
-        RTab[d] = {'time_idx_ordinate':tord,'time_idx':tidx,'BCName':dic_BCN}
-        STab[d]={'time_idx_ordinate':tord,'time_idx':tidx,'BCName':dic_BCN_SW}
+        RTab[d] = {'time_idx_ordinate': tord, 'run_duration_days': run_dur, 
+                    'time_idx': tidx, 'pluvial_BC_units': pluvial_BC_units, 
+                                                          'BCName': dic_BCN}
+        STab[d] = {'time_idx_ordinate': tord, 'run_duration_days': run_dur, 
+        						'time_idx': tidx, 'pluvial_BC_units': pluvial_BC_units,
+                                                       'BCName': dic_BCN_SW}
         SW_variables[d] = {'Rate': adj_rate, 'Capacity': maxcap, 'Seed':seed}
     results = [RTab, STab, SW_variables]
     if display_plots: 
