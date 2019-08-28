@@ -1452,7 +1452,7 @@ def combine_metadata(outputs_dir: str, BCN: str, durations: list,
     
 
 def combine_distal_results(outfiles: list, outputs_dir: plib, var: str, 
-						BCN: str, ordin: str='Hours', run_dur_dic: dict=None,
+		BCN: str, ordin: str='', pluvial_BC_units: str='', run_dur_dic: dict=None, 
 			 							remove_ind_dur: bool=True) -> dict:
     '''Combines the excess rainfall results and metadata for each duration 
        into a single file for all durations.
@@ -1470,7 +1470,8 @@ def combine_distal_results(outfiles: list, outputs_dir: plib, var: str,
                     events[k] = list(v.values())
             val = {'time_idx_ordinate': ordin, 
                    'run_duration_days': run_dur_dic[str(dur)],
-                   'time_idx': dates, 'BCName': {BCN: events}}  
+                   'time_idx': dates, 'pluvial_BC_units': pluvial_BC_units,
+                   'BCName': {BCN: events}}  
         elif var=='Metadata' and 'Metadata' in str(file):
             dur = int(str(file).split('_')[2].replace('Dur', ''))
             with open(outputs_dir/file) as f:
