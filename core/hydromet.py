@@ -820,22 +820,41 @@ def convert_tempEpsilon(tempEpsilon: float, incr_excess: pd.DataFrame) -> int:
 
 
 def bin_sorting_dev(incr_excess: pd.DataFrame, nbins: int, 
-                min_thresh: float=0.01, display_print: bool = True) -> list:
+                        min_thresh: float=0.01, display_print: bool = True, 
+                                        display_plots: bool = True) -> list:
     '''Computes the histogram of the series data with the specified number
        of bins and returns the results as a list.
     '''
-    runoff_data= incr_excess.sum()
+    runoff_data = incr_excess.sum()
     runoff_data_0 = runoff_data[runoff_data<min_thresh]
     runoff_data_non0 = runoff_data[runoff_data>=min_thresh]
-    hist_data = np.histogram(runoff_data_non0, bins=50)
+    hist_data = np.histogram(runoff_data_non0, bins=nbins)
     bins = hist_data[1]
     binCount = hist_data[0]
     binData = dict(zip(binCount, bins))
     binData.pop(0, None)# Drop the last zero
     binData = sorted(binData.items(), key=operator.itemgetter(1))
     n_zero = len(runoff_data_0)
-    if n_zero > 0: binData = [(n_zero, 0.0)]+binData
+    if n_zero > 0: 
+        binData = [(n_zero, 0.0)]+binData
+    h = [i[0] for i in binData]
+    x = [i[1] for i in binData]    
     if display_print: print(display(binData))
+    if display_plots:
+        fig, axs = plt.subplots(1, 1)
+        if len(binData)>=3:
+            w = x[2]-x[1]
+            axs.bar(x, h, w, align='edge') 
+        else:
+            axs.bar(x, h, align='edge') 
+        axs.set_title('Histogram of the Binned Events')
+        axs.set_xlabel('Incremental Excess (inches)')
+        axs.set_ylabel('Number of Events')    
+        plt.show()
+    if max(h)>=1000.0:
+        warnings.warn("One or more of the convolution bins has over 1000 "
+            "events, which could take over 12 hours to complete, consider "
+            "adjusting nbin and/or min_thresh in EventsTable.ipynb")
     return binData
 
 
