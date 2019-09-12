@@ -1580,14 +1580,15 @@ def plot_rand_precip_data(df: pd.DataFrame, rand_data: list, duration: int,
     '''
     fig, ax = plt.subplots(figsize=(20, 6))
     ax.grid(True, which="both")
-    ax.semilogx(df.index, df['Upper (90%)'], color='darkolivegreen', 
+    idx = list(df.index)
+    ax.semilogx(idx, df['Upper (90%)'], color='darkolivegreen', 
                         linewidth=3, label=r'Upper (90%) Confidence Limit')
-    ax.semilogx(df.index, df['Expected Value'], color='darkred', linewidth=2, 
+    ax.semilogx(idx, df['Expected Value'], color='darkred', linewidth=2, 
                                                     label='Expected Value')
-    ax.semilogx(df.index, df['Lower (90%)'], color='darkblue', linewidth=3, 
+    ax.semilogx(idx, df['Lower (90%)'], color='darkblue', linewidth=3, 
                                     label=r'Lower (90%) Confidence Limit')
     for col in rand_data:
-        ax.scatter(df.index, df[col], s=25, edgecolor='black', 
+        ax.scatter(idx, df[col], s=25, edgecolor='black', 
                     linewidth='1',  facecolor=np.random.rand(4,), label=col)
     def mil(x: float, pos: int) -> str:
         ''' Convert the passed x-value to a string.
