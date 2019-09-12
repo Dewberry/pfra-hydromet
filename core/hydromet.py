@@ -905,20 +905,38 @@ def test_shapes(dataslice: pd.DataFrame, col: str,
     return curve_shape
 
 
-def conv_ts(curve_test_df: pd.DataFrame, 
-        convEpsilon: float=150.0, volEpsilon: float=50.0) -> (dict, list):
+def conv_ts_zero_events(idx: list) -> list:
+    """Creates a dictionary containing all possible combinations of the items 
+       in the passed list as well as a list of ones whose length is equal to 
+       the number of combinations. 
+    """
+    test_dic = {}
+    for i, c in enumerate(idx):
+        for nc in idx[i+1:]:
+            test_dic[(c, nc)] = 1.0
+    test_values = list(np.ones(len(test_dic.keys())))
+    results = [test_dic, test_values]
+    return results
+
+
+def conv_ts(curve_test_df: pd.DataFrame, convEpsilon: float=150.0, 
+                                volEpsilon: float=50.0, test_dic: dict=None, 
+                                    test_values: list=None) -> (dict, list):
     '''For each event combination, a test statistic is calculated in order
        to quantify the similarity between the two temporal distributions.
        Note that in this function's code, "c" and "nc" refer to "column" 
        and "next column", respectively.
     '''
     df = curve_test_df.copy()
-    test_dic = {}
+    if test_dic==None:
+        test_dic = {}
+    if test_values==None:
+        test_values = []
     for i, c in enumerate(df.columns):
         for nc in df.columns[i+1:]:
             test = test_stat(df, df, c, nc, convEpsilon, volEpsilon)
             test_dic[(c, nc)] = test
-	test_values = list(test_dic.values())
+    test_values += list(test_dic.values())
     test_values.sort(reverse=True)
     return test_dic, test_values
 
@@ -1181,8 +1199,8 @@ def dss_map(outputs_dir: str, var: str, tstep: int, tstep_units: str,
 
 
 def excess_df_to_input(outputs_dir: str, df: pd.DataFrame, tstep: float,
-        				tstep_units: str, scen_name: str, open_op: str='w', 
-        								to_dss: str='ToDSS.input') -> None:
+                        tstep_units: str, scen_name: str, open_op: str='w', 
+                                        to_dss: str='ToDSS.input') -> None:
     '''Writes the excess rainfall dataframe to an input file according to the 
        struture specified within DSS_MAP.input.
     '''
@@ -1290,7 +1308,7 @@ def checkif_SWinfra(pluvial_params_dir: plib, BCN: str,
 
 
 def get_stormwater_rate_cap(pluvial_params_dir: plib, BCN: str, 
-	           SW_rate_col, SW_cap_col, display_print: bool=True) -> list:
+               SW_rate_col, SW_cap_col, display_print: bool=True) -> list:
     '''Extract the stormwater removal rate and capacity from the pluvial 
        parameters Excel Workbook for the specified boundary condition name. 
     '''
@@ -1407,7 +1425,7 @@ def get_lateral_inflow_domains(pluvial_params_dir: plib, BCN: str,
 
 def combine_results(var: str, outputs_dir: str, BCN: str, durations: list,
         tempEpsilon_dic: dict, convEpsilon_dic: dict, volEpsilon_dic: dict,
-         		run_dur_dic: dict=None, remove_ind_dur: bool = True) -> dict:
+                run_dur_dic: dict=None, remove_ind_dur: bool = True) -> dict:
     '''Combines the excess rainfall *.csv files for each duration into a 
        single dictionary for all durations.
     '''
@@ -1472,8 +1490,8 @@ def combine_metadata(outputs_dir: str, BCN: str, durations: list,
     
 
 def combine_distal_results(outfiles: list, outputs_dir: plib, var: str, 
-		BCN: str, ordin: str='', pluvial_BC_units: str='', run_dur_dic: dict=None, 
-			 							remove_ind_dur: bool=True) -> dict:
+        BCN: str, ordin: str='', pluvial_BC_units: str='', run_dur_dic: dict=None, 
+                                        remove_ind_dur: bool=True) -> dict:
     '''Combines the excess rainfall results and metadata for each duration 
        into a single file for all durations.
     '''
@@ -1780,7 +1798,7 @@ def plot_lateral_inflow_hydro(ReducedTable: dict, durations: list, BCN: str,
 
 
 def plot_amount_vs_weight(weights_dic: dict, excess_dic: dict, mainBCN: str,
-									distalBCN: str=None) -> plt.subplots:
+                                    distalBCN: str=None) -> plt.subplots:
     '''Plot the total excess rainfall for each event versus its weight.
     '''
     if distalBCN==None: distalBCN=mainBCN
