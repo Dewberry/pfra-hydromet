@@ -1308,23 +1308,50 @@ def checkif_SWinfra(pluvial_params_dir: plib, BCN: str,
 
 
 def get_stormwater_rate_cap(pluvial_params_dir: plib, BCN: str, 
-               SW_rate_col, SW_cap_col, display_print: bool=True) -> list:
-    '''Extract the stormwater removal rate and capacity from the pluvial 
-       parameters Excel Workbook for the specified boundary condition name. 
+                        SW_rate_col: str, SW_cap_col: str, SW_eff_col: str,
+                                        display_print: bool=True) -> list:
+    '''Extract the stormwater removal rate, capacity, and efficiency from the
+       pluvial parameters Excel Workbook for the specified boundary condition 
+       name. 
     '''
     df = pd.read_excel(pluvial_params_dir, sheet_name = 'Pluvial_Domain')
     pp = df[df['Pluvial Domain']==BCN]
-    assert SW_rate_col and SW_cap_col in list(pp.columns), ('The specified '
-        'rate and/or capacity column names are not in the '
-        'Pluvial_Parameters.xlsx. Update the column names and rerun.')
+    columns = list(pp.columns)
+    assert SW_rate_col and SW_cap_col in columns, ('The specified rate and/or'
+        ' capacity column names are not in the Pluvial_Parameters.xlsx. Update'
+        ' the column names and rerun.')
     rate = pp[SW_rate_col].values[0]
     maxcap = pp[SW_cap_col].values[0]
-    rate_cap = [rate, maxcap]
+    if SW_eff_col not in columns:
+        warnings.warn('The provided stormwater efficiency column is not in the'
+            ' Pluvial_Parameters.xlsx. An effiency of 100 percent will be used'
+            ' unless the Workbook is updated.')
+        eff = 1.0
+    else:
+        eff = pp[SW_eff_col].values[0]
+    assert 0.0<=eff<=1.0, ('Check that the specified stormwater efficiency'
+                        ' is between 0 and 1, i.e. between 0 and 100 percent')
+    rate_cap_eff = [rate, maxcap, eff]
     if display_print: 
         print(display(pp.head(2)))
-        print('SW Rate: {0} in/30min\nSW Capacity: {1} in/unit '
-                                                'area'.format(rate, maxcap))
-    return rate_cap
+        print('SW Rate: {0} in/30min\nSW Capacity: {1} in/unit area\nSW '
+                                'Efficiency: {2} percent'.format(rate, maxcap,
+                                                                    eff*100.0))
+    return rate_cap_eff
+
+
+
+def adj_stormwater_rate_cap(rate: float, maxcap: float, efficiency: float, 
+                                                verbose: bool=True) -> list:
+    """Adjust the stormwater rate and capacity by the stormwater efficiency.
+    """
+    adj_rate = rate*efficiency
+    adj_cap = maxcap*efficiency
+    results = [adj_rate, adj_cap]
+    if verbose:
+        print('Adjusted SW Rate: {0} in/30min\nAdjusted SW Capacity: {1} '
+                                'in/unit area'.format(adj_rate, adj_cap))
+    return results
 
 
 def determine_timestep(dic_dur: dict, display_print: bool=True) -> float:

@@ -55,7 +55,8 @@ def main(EventsTable: dict, durations: list, BCN: str,
         else:
             adj_rate = rate*(ts*2.0)
             if display_print: 
-                print('Rate:', adj_rate, 'Maximum Capacity:', maxcap)
+                print('Adjusted rate:', adj_rate, 'Adjusted maximum '
+                                                        'capacity:', maxcap)
         dic_BCN = {}
         dic_BCN_SW = {}
         dic_reduced = {}
@@ -72,7 +73,7 @@ def main(EventsTable: dict, durations: list, BCN: str,
                     'time_idx': tidx, 'pluvial_BC_units': pluvial_BC_units, 
                                                           'BCName': dic_BCN}
         STab[d] = {'time_idx_ordinate': tord, 'run_duration_days': run_dur, 
-        						'time_idx': tidx, 'pluvial_BC_units': pluvial_BC_units,
+                    'time_idx': tidx, 'pluvial_BC_units': pluvial_BC_units,
                                                        'BCName': dic_BCN_SW}
         SW_variables[d] = {'Rate': adj_rate, 'Capacity': maxcap, 'Seed':seed}
     results = [RTab, STab, SW_variables]
