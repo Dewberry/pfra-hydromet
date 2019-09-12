@@ -826,7 +826,8 @@ def bin_sorting_dev(incr_excess: pd.DataFrame, nbins: int,
        of bins and returns the results as a list.
     '''
     runoff_data = incr_excess.sum()
-    runoff_data_0 = runoff_data[runoff_data<min_thresh]
+    n_zero = len(runoff_data[runoff_data==0.0])
+    n_blwthresh = len(runoff_data[runoff_data<min_thresh])
     runoff_data_non0 = runoff_data[runoff_data>=min_thresh]
     hist_data = np.histogram(runoff_data_non0, bins=nbins)
     bins = hist_data[1]
@@ -834,9 +835,10 @@ def bin_sorting_dev(incr_excess: pd.DataFrame, nbins: int,
     binData = dict(zip(binCount, bins))
     binData.pop(0, None)# Drop the last zero
     binData = sorted(binData.items(), key=operator.itemgetter(1))
-    n_zero = len(runoff_data_0)
-    if n_zero > 0: 
-        binData = [(n_zero, 0.0)]+binData
+    if n_zero > 0:
+        n_blwthresh = n_blwthresh - n_zero + 1
+    if n_blwthresh > 0: 
+        binData = [(n_blwthresh, 0.0)]+binData
     h = [i[0] for i in binData]
     x = [i[1] for i in binData]    
     if display_print: print(display(binData))
@@ -853,8 +855,8 @@ def bin_sorting_dev(incr_excess: pd.DataFrame, nbins: int,
         plt.show()
     if max(h)>=1000.0:
         warnings.warn("One or more of the convolution bins has over 1000 "
-            "events, which could take over 12 hours to complete, consider "
-            "adjusting nbin and/or min_thresh in EventsTable.ipynb")
+            "nonzero events, which could take over 12 hours to complete, "
+            "consider adjusting nbin and/or min_thresh in EventsTable.ipynb")
     return binData
 
 
@@ -912,12 +914,11 @@ def conv_ts(curve_test_df: pd.DataFrame,
     '''
     df = curve_test_df.copy()
     test_dic = {}
-    test_values = []
     for i, c in enumerate(df.columns):
         for nc in df.columns[i+1:]:
             test = test_stat(df, df, c, nc, convEpsilon, volEpsilon)
             test_dic[(c, nc)] = test
-            test_values = test_values+[test]
+	test_values = list(test_dic.values())
     test_values.sort(reverse=True)
     return test_dic, test_values
 
