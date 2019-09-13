@@ -820,22 +820,43 @@ def convert_tempEpsilon(tempEpsilon: float, incr_excess: pd.DataFrame) -> int:
 
 
 def bin_sorting_dev(incr_excess: pd.DataFrame, nbins: int, 
-                min_thresh: float=0.01, display_print: bool = True) -> list:
+                        min_thresh: float=0.01, display_print: bool = True, 
+                                        display_plots: bool = True) -> list:
     '''Computes the histogram of the series data with the specified number
        of bins and returns the results as a list.
     '''
-    runoff_data= incr_excess.sum()
-    runoff_data_0 = runoff_data[runoff_data<min_thresh]
+    runoff_data = incr_excess.sum()
+    n_zero = len(runoff_data[runoff_data==0.0])
+    n_blwthresh = len(runoff_data[runoff_data<min_thresh])
     runoff_data_non0 = runoff_data[runoff_data>=min_thresh]
-    hist_data = np.histogram(runoff_data_non0, bins=50)
+    hist_data = np.histogram(runoff_data_non0, bins=nbins)
     bins = hist_data[1]
     binCount = hist_data[0]
     binData = dict(zip(binCount, bins))
     binData.pop(0, None)# Drop the last zero
     binData = sorted(binData.items(), key=operator.itemgetter(1))
-    n_zero = len(runoff_data_0)
-    if n_zero > 0: binData = [(n_zero, 0.0)]+binData
+    if n_zero > 0:
+        n_blwthresh = n_blwthresh - n_zero + 1
+    if n_blwthresh > 0: 
+        binData = [(n_blwthresh, 0.0)]+binData
+    h = [i[0] for i in binData]
+    x = [i[1] for i in binData]    
     if display_print: print(display(binData))
+    if display_plots:
+        fig, axs = plt.subplots(1, 1)
+        if len(binData)>=3:
+            w = x[2]-x[1]
+            axs.bar(x, h, w, align='edge') 
+        else:
+            axs.bar(x, h, align='edge') 
+        axs.set_title('Histogram of the Binned Events')
+        axs.set_xlabel('Incremental Excess (inches)')
+        axs.set_ylabel('Number of Events')    
+        plt.show()
+    if max(h)>=1000.0:
+        warnings.warn("One or more of the convolution bins has over 1000 "
+            "nonzero events, which could take over 12 hours to complete, "
+            "consider adjusting nbin and/or min_thresh in EventsTable.ipynb")
     return binData
 
 
@@ -884,21 +905,38 @@ def test_shapes(dataslice: pd.DataFrame, col: str,
     return curve_shape
 
 
-def conv_ts(curve_test_df: pd.DataFrame, 
-        convEpsilon: float=150.0, volEpsilon: float=50.0) -> (dict, list):
+def conv_ts_zero_events(idx: list) -> list:
+    """Creates a dictionary containing all possible combinations of the items 
+       in the passed list as well as a list of ones whose length is equal to 
+       the number of combinations. 
+    """
+    test_dic = {}
+    for i, c in enumerate(idx):
+        for nc in idx[i+1:]:
+            test_dic[(c, nc)] = 1.0
+    test_values = list(np.ones(len(test_dic.keys())))
+    results = [test_dic, test_values]
+    return results
+
+
+def conv_ts(curve_test_df: pd.DataFrame, convEpsilon: float=150.0, 
+                                volEpsilon: float=50.0, test_dic: dict=None, 
+                                    test_values: list=None) -> (dict, list):
     '''For each event combination, a test statistic is calculated in order
        to quantify the similarity between the two temporal distributions.
        Note that in this function's code, "c" and "nc" refer to "column" 
        and "next column", respectively.
     '''
     df = curve_test_df.copy()
-    test_dic = {}
-    test_values = []
+    if test_dic==None:
+        test_dic = {}
+    if test_values==None:
+        test_values = []
     for i, c in enumerate(df.columns):
         for nc in df.columns[i+1:]:
             test = test_stat(df, df, c, nc, convEpsilon, volEpsilon)
             test_dic[(c, nc)] = test
-            test_values = test_values+[test]
+    test_values += list(test_dic.values())
     test_values.sort(reverse=True)
     return test_dic, test_values
 
@@ -1161,8 +1199,8 @@ def dss_map(outputs_dir: str, var: str, tstep: int, tstep_units: str,
 
 
 def excess_df_to_input(outputs_dir: str, df: pd.DataFrame, tstep: float,
-        				tstep_units: str, scen_name: str, open_op: str='w', 
-        								to_dss: str='ToDSS.input') -> None:
+                        tstep_units: str, scen_name: str, open_op: str='w', 
+                                        to_dss: str='ToDSS.input') -> None:
     '''Writes the excess rainfall dataframe to an input file according to the 
        struture specified within DSS_MAP.input.
     '''
@@ -1270,23 +1308,50 @@ def checkif_SWinfra(pluvial_params_dir: plib, BCN: str,
 
 
 def get_stormwater_rate_cap(pluvial_params_dir: plib, BCN: str, 
-	           SW_rate_col, SW_cap_col, display_print: bool=True) -> list:
-    '''Extract the stormwater removal rate and capacity from the pluvial 
-       parameters Excel Workbook for the specified boundary condition name. 
+                        SW_rate_col: str, SW_cap_col: str, SW_eff_col: str,
+                                        display_print: bool=True) -> list:
+    '''Extract the stormwater removal rate, capacity, and efficiency from the
+       pluvial parameters Excel Workbook for the specified boundary condition 
+       name. 
     '''
     df = pd.read_excel(pluvial_params_dir, sheet_name = 'Pluvial_Domain')
     pp = df[df['Pluvial Domain']==BCN]
-    assert SW_rate_col and SW_cap_col in list(pp.columns), ('The specified '
-        'rate and/or capacity column names are not in the '
-        'Pluvial_Parameters.xlsx. Update the column names and rerun.')
+    columns = list(pp.columns)
+    assert SW_rate_col and SW_cap_col in columns, ('The specified rate and/or'
+        ' capacity column names are not in the Pluvial_Parameters.xlsx. Update'
+        ' the column names and rerun.')
     rate = pp[SW_rate_col].values[0]
     maxcap = pp[SW_cap_col].values[0]
-    rate_cap = [rate, maxcap]
+    if SW_eff_col not in columns:
+        warnings.warn('The provided stormwater efficiency column is not in the'
+            ' Pluvial_Parameters.xlsx. An effiency of 100 percent will be used'
+            ' unless the Workbook is updated.')
+        eff = 1.0
+    else:
+        eff = pp[SW_eff_col].values[0]
+    assert 0.0<=eff<=1.0, ('Check that the specified stormwater efficiency'
+                        ' is between 0 and 1, i.e. between 0 and 100 percent')
+    rate_cap_eff = [rate, maxcap, eff]
     if display_print: 
         print(display(pp.head(2)))
-        print('SW Rate: {0} in/30min\nSW Capacity: {1} in/unit '
-                                                'area'.format(rate, maxcap))
-    return rate_cap
+        print('SW Rate: {0} in/30min\nSW Capacity: {1} in/unit area\nSW '
+                                'Efficiency: {2} percent'.format(rate, maxcap,
+                                                                    eff*100.0))
+    return rate_cap_eff
+
+
+
+def adj_stormwater_rate_cap(rate: float, maxcap: float, efficiency: float, 
+                                                verbose: bool=True) -> list:
+    """Adjust the stormwater rate and capacity by the stormwater efficiency.
+    """
+    adj_rate = rate*efficiency
+    adj_cap = maxcap*efficiency
+    results = [adj_rate, adj_cap]
+    if verbose:
+        print('Adjusted SW Rate: {0} in/30min\nAdjusted SW Capacity: {1} '
+                                'in/unit area'.format(adj_rate, adj_cap))
+    return results
 
 
 def determine_timestep(dic_dur: dict, display_print: bool=True) -> float:
@@ -1387,7 +1452,7 @@ def get_lateral_inflow_domains(pluvial_params_dir: plib, BCN: str,
 
 def combine_results(var: str, outputs_dir: str, BCN: str, durations: list,
         tempEpsilon_dic: dict, convEpsilon_dic: dict, volEpsilon_dic: dict,
-         		run_dur_dic: dict=None, remove_ind_dur: bool = True) -> dict:
+                run_dur_dic: dict=None, remove_ind_dur: bool = True) -> dict:
     '''Combines the excess rainfall *.csv files for each duration into a 
        single dictionary for all durations.
     '''
@@ -1452,8 +1517,8 @@ def combine_metadata(outputs_dir: str, BCN: str, durations: list,
     
 
 def combine_distal_results(outfiles: list, outputs_dir: plib, var: str, 
-		BCN: str, ordin: str='', pluvial_BC_units: str='', run_dur_dic: dict=None, 
-			 							remove_ind_dur: bool=True) -> dict:
+        BCN: str, ordin: str='', pluvial_BC_units: str='', run_dur_dic: dict=None, 
+                                        remove_ind_dur: bool=True) -> dict:
     '''Combines the excess rainfall results and metadata for each duration 
        into a single file for all durations.
     '''
@@ -1561,14 +1626,15 @@ def plot_rand_precip_data(df: pd.DataFrame, rand_data: list, duration: int,
     '''
     fig, ax = plt.subplots(figsize=(20, 6))
     ax.grid(True, which="both")
-    ax.semilogx(df.index, df['Upper (90%)'], color='darkolivegreen', 
+    idx = list(df.index)
+    ax.semilogx(idx, df['Upper (90%)'], color='darkolivegreen', 
                         linewidth=3, label=r'Upper (90%) Confidence Limit')
-    ax.semilogx(df.index, df['Expected Value'], color='darkred', linewidth=2, 
+    ax.semilogx(idx, df['Expected Value'], color='darkred', linewidth=2, 
                                                     label='Expected Value')
-    ax.semilogx(df.index, df['Lower (90%)'], color='darkblue', linewidth=3, 
+    ax.semilogx(idx, df['Lower (90%)'], color='darkblue', linewidth=3, 
                                     label=r'Lower (90%) Confidence Limit')
     for col in rand_data:
-        ax.scatter(df.index, df[col], s=25, edgecolor='black', 
+        ax.scatter(idx, df[col], s=25, edgecolor='black', 
                     linewidth='1',  facecolor=np.random.rand(4,), label=col)
     def mil(x: float, pos: int) -> str:
         ''' Convert the passed x-value to a string.
@@ -1759,7 +1825,7 @@ def plot_lateral_inflow_hydro(ReducedTable: dict, durations: list, BCN: str,
 
 
 def plot_amount_vs_weight(weights_dic: dict, excess_dic: dict, mainBCN: str,
-									distalBCN: str=None) -> plt.subplots:
+                                    distalBCN: str=None) -> plt.subplots:
     '''Plot the total excess rainfall for each event versus its weight.
     '''
     if distalBCN==None: distalBCN=mainBCN

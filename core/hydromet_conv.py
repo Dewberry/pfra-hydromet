@@ -35,7 +35,7 @@ def main(binData: list, incr_excess: pd.DataFrame, tempE: float,
                 excess events as a dataframe, and the final and mid-bin group 
                 IDs as dictionaries. 
 
-    '''   
+    '''  
     penult_curves = pd.DataFrame()
     penult_groups = {}
     penult_tests = {} 
@@ -45,7 +45,7 @@ def main(binData: list, incr_excess: pd.DataFrame, tempE: float,
         start = time.time()
         if b[1] == binData[0][1]:   
             binstart, binstop = 0, binData[1][1]
-        elif b[1] == binData[-1][1]: 
+        if b[1] == binData[-1][1]: 
             binstart, binstop = b[1], b[1]+100
         else:
             binstart, binstop = binData[i][1], binData[i+1][1]   
@@ -54,9 +54,16 @@ def main(binData: list, incr_excess: pd.DataFrame, tempE: float,
         n_binned_events = dataslice.shape[1]
         if n_binned_events > 1:
             # Prep data for convolution test 
-            curv_df = prep_data_for_convolution(dataslice, adj_tempE)                                            
+            curv_df = prep_data_for_convolution(dataslice, adj_tempE)
             # Perform the convolution to group curves:
-            test_dic, test_values = conv_ts(curv_df, convE, volE)                       
+            curv_df_sum = curv_df.sum()
+            idx = curv_df_sum[curv_df_sum>0].index
+            idx0 = curv_df_sum[curv_df_sum==0].index
+            if len(idx0)>=2:
+                test_dic0, test_values0 = conv_ts_zero_events(idx0)
+                test_dic, test_values = conv_ts(curv_df[idx], convE, volE, test_dic0, test_values0) 
+            else:
+                test_dic, test_values = conv_ts(curv_df, convE, volE) 
             events = list(curv_df.columns)                                                                         
             n_init = len(events) 
             all_groups = group_curves(test_dic, test_values, events, tsthresh)                                 
@@ -64,7 +71,7 @@ def main(binData: list, incr_excess: pd.DataFrame, tempE: float,
             updated_group, upd_curv = check_upd_curv(all_groups, upd_curv, curv_df, convE, volE, tsthresh)
             n_fin =  len(upd_curv.columns)
             if display_print: print('Final Groups in Count 0: {0};'.format(n_fin), 'Max'
-                                            ' Test Stat: {0}'.format(max(test_values)))  
+                                        ' Test Stat: {0}'.format(max(test_values)))   
             count = 1
             # Repeat the convolution with the grouped curves:
             while count <=10 and max(test_values) >= tsthresh and 1 < n_fin < n_init:
