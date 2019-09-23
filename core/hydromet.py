@@ -1329,8 +1329,8 @@ def get_stormwater_rate_cap(pluvial_params_dir: plib, BCN: str,
         eff = 1.0
     else:
         eff = pp[SW_eff_col].values[0]
-    assert 0.0<=eff<=1.0, ('Check that the specified stormwater efficiency'
-                        ' is between 0 and 1, i.e. between 0 and 100 percent')
+    #assert 0.0<=eff<=1.0, ('Check that the specified stormwater efficiency'
+    #                    ' is between 0 and 1, i.e. between 0 and 100 percent')
     rate_cap_eff = [rate, maxcap, eff]
     if display_print: 
         print(display(pp.head(2)))
