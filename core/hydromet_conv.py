@@ -57,8 +57,7 @@ def main(binData: list, incr_excess: pd.DataFrame, tempE: float,
         n_nonzero = len(idx)
         if n_zero >= 1:
             curve = dataslice[idx0[0]].copy()
-            curve.columns = [group_start_num]
-
+            curve.name = group_start_num
             penult_curves = pd.concat([penult_curves, curve], axis=1)
             penult_groups[group_start_num] = list(dataslice[idx0].columns)
             penult_tests[group_start_num] = [1.0]
