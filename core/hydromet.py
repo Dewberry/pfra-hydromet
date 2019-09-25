@@ -937,6 +937,7 @@ def conv_ts(curve_test_df: pd.DataFrame, convEpsilon: float=150.0,
             test = test_stat(df, df, c, nc, convEpsilon, volEpsilon)
             test_dic[(c, nc)] = test
     test_values += list(test_dic.values())
+    test_values =  list(set(test_values))
     test_values.sort(reverse=True)
     return test_dic, test_values
 
@@ -977,7 +978,7 @@ def group_curves(test_dic: dict, test_values: list, events: list,
     for i, val in enumerate(test_values):
         if val>=test_stat_threshold:
             for k, v in test_dic.items():
-                if v==test_values[i]:
+                if v==val:
                     if k[0] not in grouped and k[1] not in grouped:
                         curve_group[g]=[k[0], k[1]]
                         grouped+=[k[0], k[1]]
