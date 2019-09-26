@@ -27,7 +27,7 @@ def main(EventsTable: dict, durations: list, BCN: str,
        seed: The random number generator seed as an integer.
        display_print: Bool specifying whether to display print statements.
        display_plots: Bool specifying whether to display the plot.
-
+   
        Returns
        -------
        results: A list of dictionaries, which included the incremental reduced

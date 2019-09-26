@@ -1494,6 +1494,39 @@ def combine_results(var: str, outputs_dir: str, BCN: str, durations: list,
     return dic
     
 
+def pad_pluvial_forcing(f_dic: dict, uniform_pad: bool = True, plen: int = 2,
+                                                verbose: bool = True) -> dict:
+    """Pad the time index and the pluvial forcing data of the passed pluvial 
+       dictionary.
+    """
+    updated_dic = {}
+    for d in list(f_dic.keys()):
+        updated_dic[d] = {}
+        for k, v in f_dic[d].items():
+            run_dur = f_dic[d]['run_duration_days']
+            run_dur_hr = run_dur*24.0
+            idx = f_dic[d]['time_idx']
+            tstep = idx[1] - idx[0]
+            start = idx[-1] + tstep
+            if not uniform_pad:
+                plen = int((run_dur_hr-start)/tstep)+1
+            if k == 'time_idx':
+                updated_dic[d][k] = idx + list(np.arange(start, 
+                                               start+plen*tstep, tstep))
+            elif k == 'BCName':
+                bcns = list(f_dic[d][k].keys())
+                updated_dic[d][k] = {}
+                for b in bcns:
+                    updated_dic[d][k][b] = {}
+                    for e, vals in f_dic[d][k][b].items():
+                        updated_dic[d][k][b][e] = vals + list(np.zeros(plen))
+            else:
+                updated_dic[d][k] = v
+        if verbose:
+            print('Padded the forcing for {0} with {1} zeros'.format(d, plen))
+    return updated_dic
+
+
 def combine_metadata(outputs_dir: str, BCN: str, durations: list, 
         tempEpsilon_dic: dict, convEpsilon_dic: dict, volEpsilon_dic: dict,
                                         remove_ind_dur: bool = True) -> dict:
