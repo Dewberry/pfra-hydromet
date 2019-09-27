@@ -5,9 +5,10 @@ from hydromet import*
 def main(md: dict, weights_dic: dict, durations: list, mainBCN: str, CN: int, 
     arc_data: dict, Project_Area: str,  Pluvial_Model: str, distalBCN: str, 
                 outputs_dir: plib, time_idx_ordinate: str, run_dur_dic: dict, 
-                          pluvial_BC_units: str, adjust_CN_less24: bool=False, 
-                    remove_intermediates: bool=True, display_print: bool=True, 
-                                                      plot: bool=True) -> None:
+                        pluvial_BC_units: str, adjust_CN_less24: bool = False, 
+                remove_intermediates: bool = True, display_print: bool = True, 
+        plot: bool = True, pad_forcing: bool = True, uniform_pad: bool = True, 
+                                                    pad_num: int = 2) -> None:
     '''Extracts data from the metadata dictionary, calculates random curve 
        numbers, performs the excess rainfall calculation, groups the events,
        saves the grouped incremental excess rainfall and metadata, and plots
@@ -45,7 +46,12 @@ def main(md: dict, weights_dic: dict, durations: list, mainBCN: str, CN: int,
                              have been added to the final metadata file.
        display_print: Bool specifying whether to display print statements.
        plot: Bool specifying whether to display plots.
-   
+       pad_forcing: Bool specifying whether to pad the forcing time series. 
+       uniform_pad: Bool specifying whether to uniformly pad the forcing 
+                    time series or pad it so that it is the same length as
+                    the run duration.
+       pad_num: The number of zeros to uniformly pad the forcing time series.
+       
        Returns
        -------
        None
@@ -120,6 +126,9 @@ def main(md: dict, weights_dic: dict, durations: list, mainBCN: str, CN: int,
     excess_dic = combine_distal_results(outfiles, outputs_dir, 'Excess',
                 distalBCN, time_idx_ordinate, pluvial_BC_units, run_dur_dic, 
                                                         remove_intermediates)
+    if pad_forcing: 
+        excess_dic = pad_pluvial_forcing(excess_dic, uniform_pad, pad_num, 
+                                                            verbose = False)
     fn_final = '{0}_{1}_{2}'.format(Project_Area, Pluvial_Model, distalBCN)
     with open(outputs_dir/'{0}.json'.format(fn_final),'w') as f:
         json.dump(excess_dic, f)     

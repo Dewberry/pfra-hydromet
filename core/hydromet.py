@@ -26,6 +26,7 @@ from scipy.optimize import minimize
 from scipy import interpolate, integrate
 from matplotlib import pyplot as plt
 from matplotlib.ticker import FuncFormatter
+from matplotlib.ticker import FormatStrFormatter
 
 import fiona
 import rasterio
@@ -1413,8 +1414,7 @@ def reduced_excess(event: list, adj_rate: float, max_capacity: float) -> list:
 
 def calc_lateral_inflow_hydro(lid: pd.DataFrame, ReducedTable: dict, 
                             StormwaterTable: dict, durations: list, BCN: str, 
-                        display_print: bool=True, display_plots: bool=True, 
-                                                plot_lid_num: int=0) -> dict:
+        									display_print: bool=True) -> dict:
     '''Calculate the lateral inflow hydrographs for each event and domain 
        given the lateral inflow contributing area.
     '''
@@ -1432,10 +1432,7 @@ def calc_lateral_inflow_hydro(lid: pd.DataFrame, ReducedTable: dict,
             for k, v in events_dic.items():
                 Q_per_ts = [(x/12.0)*a_sqft for x in v]
                 li_dic[k] = [x/(ts*60.0*60.0) for x in Q_per_ts]
-                ReducedTable[dur]['BCName'][l] = li_dic
-    l = lid_names[plot_lid_num]
-    if display_plots: 
-        plot_lateral_inflow_hydro(ReducedTable, durations, l)               
+                ReducedTable[dur]['BCName'][l] = li_dic            
     return ReducedTable
 
 
@@ -1493,6 +1490,40 @@ def combine_results(var: str, outputs_dir: str, BCN: str, durations: list,
         print('Total Weight:', all_dfs['Weight'].sum())
     return dic
     
+
+def pad_pluvial_forcing(f_dic: dict, uniform_pad: bool = True, plen: int = 2,
+                                                verbose: bool = True) -> dict:
+    """Pad the time index and the pluvial forcing data of the passed pluvial 
+       dictionary.
+    """
+    plen = int(plen)
+    updated_dic = {}
+    for d in list(f_dic.keys()):
+        updated_dic[d] = {}
+        for k, v in f_dic[d].items():
+            run_dur = f_dic[d]['run_duration_days']
+            run_dur_hr = run_dur*24.0
+            idx = f_dic[d]['time_idx']
+            tstep = idx[1] - idx[0]
+            start = idx[-1] + tstep
+            if not uniform_pad:
+                plen = int((run_dur_hr-start)/tstep)+1
+            if k == 'time_idx':
+                updated_dic[d][k] = idx + list(np.arange(start, 
+                                               start+plen*tstep, tstep))
+            elif k == 'BCName':
+                bcns = list(f_dic[d][k].keys())
+                updated_dic[d][k] = {}
+                for b in bcns:
+                    updated_dic[d][k][b] = {}
+                    for e, vals in f_dic[d][k][b].items():
+                        updated_dic[d][k][b][e] = vals + list(np.zeros(plen))
+            else:
+                updated_dic[d][k] = v
+        if verbose:
+            print('Padded the forcing for {0} with {1} zeros'.format(d, plen))
+    return updated_dic
+
 
 def combine_metadata(outputs_dir: str, BCN: str, durations: list, 
         tempEpsilon_dic: dict, convEpsilon_dic: dict, volEpsilon_dic: dict,
@@ -1763,66 +1794,53 @@ def plot_grouped_curves(final_curves: dict, y_max: float,
     return fig
 
 
-def plot_reduced_excess(ReducedTable: dict, EventsTable: dict, 
-                    durations: list, selected_BCN: str, subplot_len: int=4, 
-                                    title_adj: float=0.008) -> plt.subplot:
-    '''Plot the excess rainfall and reduced excess rainfall for the first and
-       last events of each duration within the passed dictionaries.
+def plot_reduced_excess(ReducedTable: dict, EventsTable: dict) -> plt.subplot:
+    '''Plot the excess rainfall, reduced excess rainfall, and lateral inflow 
+       hydrograph for the last event of each duration within the passed 
+       dictionaries.
     '''
-    n = len(durations)
-    fig, ax = plt.subplots(n, 1, figsize=(18, n*subplot_len+2))
-    fig.suptitle('Excess Rainfall Reduction by Duration', size = 16)
-    for i, dur in enumerate(durations):
-        if n == 1: 
-            ax_obj = ax
-        else:
-            ax_obj = ax[i]
+    for i, dur in enumerate(list(ReducedTable.keys())):
+        fig, ax = plt.subplots(1, 1, figsize=(18, 6))
+        idur = int(dur.replace('H', ''))   
         idx = ReducedTable[dur]['time_idx']
-        units = ReducedTable[dur]['time_idx_ordinate']
-        dic_re = ReducedTable[dur]['BCName'][selected_BCN]
-        dic_ex = EventsTable[dur]['BCName'][selected_BCN]
-        keys =  list(dic_re.keys())
-        sub_keys = [keys[0], keys[-1]]
-        c = ['green', 'blue']
-        for j, k in enumerate(sub_keys):
-            ax_obj.plot(idx, dic_ex[k], linestyle = '-', label=k, color=c[j])        
-            ax_obj.plot(idx,dic_re[k],linestyle='--',label=f'{k} (Reduced)',color=c[j])   
-        ax_obj.set_xlabel('Time, [{}]'.format(units))
-        ax_obj.set_ylabel('Excess Rainfall, [inches]')
-        ax_obj.grid()
-        ax_obj.legend()
-    fig.tight_layout()
-    fig.subplots_adjust(top=0.94+title_adj*(n-1))
-
-
-def plot_lateral_inflow_hydro(ReducedTable: dict, durations: list, BCN: str, 
-                subplot_len: int=4, title_adj: float=0.008) -> plt.subplot:
-    '''Plot the lateral inflow hydrographs for the specified lateral inflow 
-       boundary for the first and last events of each duration.
-    '''
-    n = len(durations)
-    fig, ax = plt.subplots(n, 1, figsize=(18, n*subplot_len+2))
-    fig.suptitle( 'Lateral Inflow Hydrographs for {}'.format(BCN), size = 16)
-    for i, dur in enumerate(durations):
-        if n == 1: 
-            ax_obj = ax
+        tstep = idx[1] - idx[0]
+        w = tstep/2
+        lat_bounds = False
+        for b in list(ReducedTable[dur]['BCName'].keys()):
+            if 'D' in b:
+                pbcn =  b
+            elif 'L' in b and not lat_bounds:
+                lbcn = b
+                lat_bounds = True
+        dic_ex = EventsTable[dur]['BCName'][pbcn]      
+        dic_re = ReducedTable[dur]['BCName'][pbcn]
+        k = list(dic_re.keys())[-1]
+        ymax = max(dic_ex[k])
+        ax.bar(idx, dic_ex[k], width = w, align = 'center', color = 'gray', 
+        											label = 'Original Excess')        
+        ax.bar(idx,dic_re[k], width = w, align = 'center', color = 'cyan', 
+        											label = 'Reduced Excess')  
+        ax.set_title('{0} Hour Duration (Event: {1})'.format(idur, k), 
+        															size = 12)
+        ax.set_xlabel('Time, [hours]')
+        ax.set_xlim(left=0)
+        ax.set_ylabel('Excess Rainfall, [inches]')
+        ax.set_ylim(ymax*2.1, 0)
+        ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))    
+        if lat_bounds: 
+            dic_lat = ReducedTable[dur]['BCName'][lbcn]
+            lih_units = ReducedTable[dur]['lateral_BC_units']
+            ax2 = ax.twinx()  
+            ymax2 = max(dic_lat[k])
+            lns3 = ax2.plot(idx, dic_lat[k], 
+            			label = '{0} Hydrograph'.format(lbcn), color = 'Navy')
+            ax2.set_ylabel('Discharge, [{0}]'.format(lih_units))
+            ax2.set_ylim(0, ymax2*2.1)
+            lines, labels = ax.get_legend_handles_labels()
+            lines2, labels2 = ax2.get_legend_handles_labels()
+            ax2.legend(lines + lines2, labels + labels2, loc='lower right')
         else:
-            ax_obj = ax[i]
-        idx = ReducedTable[dur]['time_idx']
-        time_units = ReducedTable[dur]['time_idx_ordinate']
-        lih_units = ReducedTable[dur]['lateral_BC_units']
-        dic_re = ReducedTable[dur]['BCName'][BCN]
-        keys =  list(dic_re.keys())
-        sub_keys = [keys[0], keys[-1]]
-        c = ['green', 'blue']
-        for j, k in enumerate(sub_keys):
-            ax_obj.plot(idx, dic_re[k], linestyle = '-', label=k, color=c[j])        
-        ax_obj.set_xlabel('Time, [{}]'.format(time_units))
-        ax_obj.set_ylabel('Discharge, [{}]'.format(lih_units))
-        ax_obj.grid()
-        ax_obj.legend()
-    fig.tight_layout()
-    fig.subplots_adjust(top=0.94+title_adj*(n-1))
+            ax.legend(loc = 'lower right')
 
 
 def plot_amount_vs_weight(weights_dic: dict, excess_dic: dict, mainBCN: str,

@@ -5,7 +5,7 @@ from hydromet import*
 def main(EventsTable: dict, durations: list, BCN: str, 
             rand_rate_cap: bool=False, rate: float=None, maxcap: float=None, 
                     minrate: float=None, maxrate: float=None, seed: int=None, 
-                display_print: bool=True, display_plots: bool=True) -> list:
+                                          display_print: bool=True) -> list:
     '''Calculates the reduced excess rainfall for each event within the 
        EventsTable dictionary. 
         
@@ -25,9 +25,8 @@ def main(EventsTable: dict, durations: list, BCN: str,
        maxrate: The maximum stormwater removal rate as a float. This is used
                 when rand_rate_cap is set to 'True'.
        seed: The random number generator seed as an integer.
-       display_print: Bool specifying whether to display print statements.
-       display_plots: Bool specifying whether to display the plot.
-
+       display_print: Bool specifying whether to display print statements..
+   
        Returns
        -------
        results: A list of dictionaries, which included the incremental reduced
@@ -77,8 +76,6 @@ def main(EventsTable: dict, durations: list, BCN: str,
                                                        'BCName': dic_BCN_SW}
         SW_variables[d] = {'Rate': adj_rate, 'Capacity': maxcap, 'Seed':seed}
     results = [RTab, STab, SW_variables]
-    if display_plots: 
-        plot_reduced_excess(RTab, EventsTable, durations, BCN)
     return results
 
 if __name__== "__main__":
