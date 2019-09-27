@@ -1496,6 +1496,7 @@ def pad_pluvial_forcing(f_dic: dict, uniform_pad: bool = True, plen: int = 2,
     """Pad the time index and the pluvial forcing data of the passed pluvial 
        dictionary.
     """
+    plen = int(plen)
     updated_dic = {}
     for d in list(f_dic.keys()):
         updated_dic[d] = {}
