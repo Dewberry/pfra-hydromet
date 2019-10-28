@@ -1414,7 +1414,7 @@ def reduced_excess(event: list, adj_rate: float, max_capacity: float) -> list:
 
 def calc_lateral_inflow_hydro(lid: pd.DataFrame, ReducedTable: dict, 
                             StormwaterTable: dict, durations: list, BCN: str, 
-        									display_print: bool=True) -> dict:
+                                            display_print: bool=True) -> dict:
     '''Calculate the lateral inflow hydrographs for each event and domain 
        given the lateral inflow contributing area.
     '''
@@ -1489,7 +1489,28 @@ def combine_results(var: str, outputs_dir: str, BCN: str, durations: list,
         dic = {'BCName': {BCN: weights_dic['Weight']}}
         print('Total Weight:', all_dfs['Weight'].sum())
     return dic
-    
+
+
+def check_pluvial_padding(dic: dict, verbose: bool=True) -> None:
+    """Check that the time series in the passed pluvial forcing dictionary 
+       are padded with zeros. This function asserts that the time index is 
+       longer than the duration and that all of the events for the first 
+       pluvial domain end in zero.
+    """
+    for d in list(dic.keys()):
+        idur = int(d.strip('H'))
+        idx = dic[d]['time_idx']
+        assert idx[-1] > idur, ('Pluvial forcing not padded, {0} time index'
+                                ' not greater than duration'.format(d))
+        bcns = list(dic[d]['BCName'])
+        bcn =  [x for x in bcns if 'D' in x][0]
+        for k, v in dic[d]['BCName'][bcn].items():
+            assert v[-1]==0, ('Pluvial forcing not padded, {0} {1} does not'
+                              ' end in zero'.format(bcn, k))  
+    if verbose:
+        print('Time index and first pluvial domain are padded') 
+    return None
+
 
 def pad_pluvial_forcing(f_dic: dict, uniform_pad: bool = True, plen: int = 2,
                                                 verbose: bool = True) -> dict:
@@ -1522,6 +1543,7 @@ def pad_pluvial_forcing(f_dic: dict, uniform_pad: bool = True, plen: int = 2,
                 updated_dic[d][k] = v
         if verbose:
             print('Padded the forcing for {0} with {1} zeros'.format(d, plen))
+    check_pluvial_padding(updated_dic, verbose)        
     return updated_dic
 
 
@@ -1817,11 +1839,11 @@ def plot_reduced_excess(ReducedTable: dict, EventsTable: dict) -> plt.subplot:
         k = list(dic_re.keys())[-1]
         ymax = max(dic_ex[k])
         ax.bar(idx, dic_ex[k], width = w, align = 'center', color = 'gray', 
-        											label = 'Original Excess')        
+                                                    label = 'Original Excess')        
         ax.bar(idx,dic_re[k], width = w, align = 'center', color = 'cyan', 
-        											label = 'Reduced Excess')  
+                                                    label = 'Reduced Excess')  
         ax.set_title('{0} Hour Duration (Event: {1})'.format(idur, k), 
-        															size = 12)
+                                                                    size = 12)
         ax.set_xlabel('Time, [hours]')
         ax.set_xlim(left=0)
         ax.set_ylabel('Excess Rainfall, [inches]')
@@ -1833,7 +1855,7 @@ def plot_reduced_excess(ReducedTable: dict, EventsTable: dict) -> plt.subplot:
             ax2 = ax.twinx()  
             ymax2 = max(dic_lat[k])
             lns3 = ax2.plot(idx, dic_lat[k], 
-            			label = '{0} Hydrograph'.format(lbcn), color = 'Navy')
+                        label = '{0} Hydrograph'.format(lbcn), color = 'Navy')
             ax2.set_ylabel('Discharge, [{0}]'.format(lih_units))
             ax2.set_ylim(0, ymax2*2.1)
             lines, labels = ax.get_legend_handles_labels()
