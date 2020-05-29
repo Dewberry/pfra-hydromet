@@ -84,7 +84,7 @@ def Fit_GEV_Parameters(df: pd.DataFrame, GEV_Parameters: np.ndarray, bounds, ID:
         #with the difference normalized by the return interval
         return sum(np.square( ( RI-1/(1-CDF_GEV(row[ID], x, PMP) ) )/RI ) \
                for RI, row in df.iterrows() )
-    solution = minimize(objective_func_GEV, GEV_Parameters, method='SLSQP',bounds=bounds, options={ 'disp': True})
+    solution = minimize(objective_func_GEV, GEV_Parameters, method='SLSQP', bounds=bounds, options={ 'disp': True})
     df_GEV_parameters=pd.DataFrame(data=solution.x, index=["mu", "sigma", "xi"], columns=["GEV {}".format(ID)])
     return df_GEV_parameters
 
@@ -231,7 +231,7 @@ def partition_S_avgs(n_partition: int, alpha, beta, S_limit):
     return partition_avg
 
 #Calculate the weights of the rainfall events.
-def weights_Rainfall(Return_Intervals, GEV_parameters, PMP, RI_upper_bound, NOAA_precip: pd.DataFrame, ID: str, RI_data, CN, mu):
+def weights_Rainfall(Return_Intervals: np.ndarray, GEV_parameters, PMP, RI_upper_bound, NOAA_precip: pd.DataFrame, ID: str, RI_data, CN, mu):
     '''RI_data is the return intervals from which values for the rainfall are taken directly from the input data (NOAA_precip) 
         instead of being calculated from the fitted GEV.
     '''
@@ -285,11 +285,11 @@ def weights_Rainfall(Return_Intervals, GEV_parameters, PMP, RI_upper_bound, NOAA
     return pd.concat([df_weights,  df_precip], axis=1)
 
 #Calculate runoff and runoff weights
-def runoff(Return_Intervals, RI_upper_bound, mu, GEV_parameters, PMP, alpha, beta, S_limit, partition_avg, Delta_P, error_PQ):
+def runoff(Return_Intervals, RI_upper_bound, mu, GEV_parameters, PMP, alpha, beta, S_limit, partition_avg, Delta_P, error_PQ)->tuple:
     #Define Runoff as a function of RI based on cubic spline interpolation
     n_partitions_Q = 40 #30 was too little, so increased to 40
     #Determine
-    Q_line = np.linspace(.01, PMP - 0.1, n_partitions_Q+1)
+    Q_line = np.linspace(.001, PMP - 0.1, n_partitions_Q+1)
     Return_PeriodQ= 1/(1- np.transpose([error_PQ + CDF_Q(Q, mu, alpha, beta, S_limit, GEV_parameters, PMP, partition_avg, Delta_P) for Q in Q_line]))
     #Define Runoff as a function of the return interval with a cublic spline interpolation
     tck_RI_Q = interpolate.splrep(Return_PeriodQ, Q_line)
@@ -304,7 +304,7 @@ def runoff(Return_Intervals, RI_upper_bound, mu, GEV_parameters, PMP, alpha, bet
     for i in range(0, Size):
         Bin_Bounds[Size-i-1] = Bound_L(Bin_Bounds[Size-i], Return_Intervals[Size-i-1],\
                                        mu, GEV_parameters, PMP, partition_avg,\
-                                       Delta_P, np.array([1.0]), tck_RI_Q ).x[0] 
+                                       Delta_P, np.array([1.01]), tck_RI_Q ).x[0] 
         print('Bin Ceiling = %s, Bin Floor %s' %(Bin_Bounds[Size-i],Bin_Bounds[Size-i-1] ) )
     #Calculate the Average/typical precipitation for the upper bin bound and PMP
     lower_bound = interpolate.splev(RI_upper_bound, tck_RI_Q, der=0)
