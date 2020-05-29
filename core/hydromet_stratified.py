@@ -48,20 +48,31 @@ from scipy import optimize
 
 #---------------------------------------------------------------------------#
 
+# SCS-CN runoff formula
+def Q_SCS(R,CN,mu):
+    S=1000/CN-10
+    return (R-mu*S)**2/(R-mu*S+S)
+
 #Define normalization constant to account for distribution being truncated at the PMP
-def Norm_Constant(x: np.ndarray, PMP)-> float:
+def Norm_Constant_GEV(x: np.ndarray, PMP)-> float:
     ''''Constant for distribution truncation at the PMP value 
     ''' 
     return 1/stats.genextreme.cdf(PMP, x[2], x[0], x[1])
 
+def Norm_Constant_LN(SD, mu, PMP)-> float:
+    ''''Constant for distribution truncation at the PMP value 
+    ''' 
+    return 1/stats.lognorm.cdf(PMP, SD, scale = np.exp(mu))
+
+
 def PDF_GEV(R, x: np.ndarray, PMP)-> float:
-    return Norm_Constant(x, PMP)*stats.genextreme.pdf(R ,x[2], x[0], x[1])
+    return Norm_Constant_GEV(x, PMP)*stats.genextreme.pdf(R, x[2], x[0], x[1])
 
 def CDF_GEV(R, x: np.ndarray, PMP)-> float:
-    return Norm_Constant(x, PMP)*stats.genextreme.cdf(R ,x[2], x[0], x[1])
+    return Norm_Constant_GEV(x, PMP)*stats.genextreme.cdf(R, x[2], x[0], x[1])
 
 def PPF_GEV(P, x: np.ndarray, PMP)-> float:
-    return stats.genextreme.ppf(P/Norm_Constant(x, PMP) ,x[2], x[0], x[1])
+    return stats.genextreme.ppf(P/Norm_Constant_GEV(x, PMP) ,x[2], x[0], x[1])
 
 def Fit_GEV_Parameters(df: pd.DataFrame, GEV_Parameters: np.ndarray, bounds, ID: str, PMP: float):
     def objective_func_GEV(x: np.ndarray)-> float: 
@@ -220,7 +231,10 @@ def partition_S_avgs(n_partition: int, alpha, beta, S_limit):
     return partition_avg
 
 #Calculate the weights of the rainfall events.
-def weights_Rainfall(Return_Intervals, GEV_parameters, PMP, RI_upper_bound, NOAA_precip: pd.DataFrame, ID: str):
+def weights_Rainfall(Return_Intervals, GEV_parameters, PMP, RI_upper_bound, NOAA_precip: pd.DataFrame, ID: str, RI_data, CN, mu):
+    '''RI_data is the return intervals from which values for the rainfall are taken directly from the input data (NOAA_precip) 
+        instead of being calculated from the fitted GEV.
+    '''
     Size = Return_Intervals.size #Length of Return Intervals array
     #Create array for bounds of bins for each event
     Bin_Bounds_R_topdown = np.zeros(Size+1)
@@ -250,28 +264,37 @@ def weights_Rainfall(Return_Intervals, GEV_parameters, PMP, RI_upper_bound, NOAA
     #dataframe of weights
     df_weights =  pd.DataFrame(data=data, index=RI_index, \
                            columns=['Bin Floor', 'Bin Celing','Event Weight']) 
-    #dataframe of NOAA values
-    df_R_NOAA_E = pd.DataFrame(NOAA_precip.loc[2 : 1000][ID])
-    #For the additional RI events calculate the precipitation 
-    Precip_additional_E = PPF_GEV(1-1/RI_index[RI_index>1000], GEV_parameters, PMP)
-    #Combine NOAA values and distribution based values
-    df2=pd.DataFrame(data=Precip_additional_E, index= RI_index[RI_index>1000].astype(int), \
-                 columns=[ID])  # 
+    #Based on GEV  calculate the  precipitation for each RI
+  
+    #Determine RI that are required where values are not provided in the input data
+    RI_index_calc = RI_index[ np.isin(RI_index, RI_data, invert=True) ]
+    Precip_calculate = PPF_GEV(1-1/RI_index_calc, GEV_parameters, PMP)
+    
+    df2=pd.DataFrame(data = Precip_calculate , index = RI_index_calc.astype(int), \
+                 columns=[ID])  
+    #dataframe of input values
+    df_R_NOAA_E =  NOAA_precip[ NOAA_precip.index.isin(RI_data) ]    #NOT USED pd.DataFrame(NOAA_precip.loc[RI_NOAA_L : RI_NOAA_U][ID])
+    #Combine input values and distribution based values
     df_precip = df_R_NOAA_E.append(df2)
+    #Drop column of median values
+    df_precip = df_precip.drop('Median',axis=1)
+    #Calculate the runoff
+    Q = Q_SCS( df_precip[ID].to_numpy(), CN, mu)
+    #append Runoff to the table
+    df_precip['Runoff'] = Q 
     return pd.concat([df_weights,  df_precip], axis=1)
 
 #Calculate runoff and runoff weights
-def runoff(Return_Intervals, RI_upper_bound, mu, GEV_parameters, PMP, alpha, beta,\
-           S_limit, partition_avg, Delta_P, error_PQ):
+def runoff(Return_Intervals, RI_upper_bound, mu, GEV_parameters, PMP, alpha, beta, S_limit, partition_avg, Delta_P, error_PQ):
     #Define Runoff as a function of RI based on cubic spline interpolation
     n_partitions_Q = 40 #30 was too little, so increased to 40
     #Determine
-    Q_line = np.linspace(.01, PMP-.1, n_partitions_Q+1)
-    Return_PeriodQ= 1/(1- np.transpose([error_PQ + CDF_Q( Q , mu, alpha, beta, S_limit, GEV_parameters, PMP, partition_avg, Delta_P) for Q in Q_line]))
+    Q_line = np.linspace(.01, PMP - 0.1, n_partitions_Q+1)
+    Return_PeriodQ= 1/(1- np.transpose([error_PQ + CDF_Q(Q, mu, alpha, beta, S_limit, GEV_parameters, PMP, partition_avg, Delta_P) for Q in Q_line]))
     #Define Runoff as a function of the return interval with a cublic spline interpolation
     tck_RI_Q = interpolate.splrep(Return_PeriodQ, Q_line)
     #Define return interval as a function of the runoffl with a cublic spline interpolation
-    tck_Q_RI = interpolate.splrep( Q_line, Return_PeriodQ)
+    tck_Q_RI = interpolate.splrep(Q_line, Return_PeriodQ)
     #Define runoff event bounds
     Size = Return_Intervals.size
     #Create array for bounds of bins for each event
@@ -282,7 +305,7 @@ def runoff(Return_Intervals, RI_upper_bound, mu, GEV_parameters, PMP, alpha, bet
         Bin_Bounds[Size-i-1] = Bound_L(Bin_Bounds[Size-i], Return_Intervals[Size-i-1],\
                                        mu, GEV_parameters, PMP, partition_avg,\
                                        Delta_P, np.array([1.0]), tck_RI_Q ).x[0] 
-        print('Bin Ceiling = %s, Bin Floor %s' %( Bin_Bounds[Size-i],Bin_Bounds[Size-i-1] ) )
+        print('Bin Ceiling = %s, Bin Floor %s' %(Bin_Bounds[Size-i],Bin_Bounds[Size-i-1] ) )
     #Calculate the Average/typical precipitation for the upper bin bound and PMP
     lower_bound = interpolate.splev(RI_upper_bound, tck_RI_Q, der=0)
     Avg_Q_Upper = Avg_Q(lower_bound, PMP, mu, GEV_parameters,\
@@ -305,7 +328,7 @@ def runoff(Return_Intervals, RI_upper_bound, mu, GEV_parameters, PMP, alpha, bet
     #dataframe of weights
     df_weights =  pd.DataFrame(data=data, index=Return_Intervals_Q.astype(int), \
                            columns=['Bin Floor', 'Bin Celing','Event Weight']) 
-    return tck_RI_Q, tck_Q_RI, pd.concat([ df_weights,df_runoff ,], axis=1)
+    return tck_RI_Q, tck_Q_RI, pd.concat([ df_weights, df_runoff], axis=1)
 
 #Calculate median and average max. potential retention scenarios for given runoff
 def Scenarios_Avg_S_Median_S(df_weights_runoff, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha, beta, S_limit):
@@ -343,3 +366,35 @@ def Scenarios_low_and_high_S(df_runoff_SR1, mu, GEV_parameters, PMP, partition_a
                       columns=['Event Weight', 'Runoff','Avg. S (Lower 50%)', 'Rainfall', \
                                'Event Weight', 'Runoff','Avg. S (Upper 50%)', 'Rainfall'])
     return df_SR2
+
+
+# Calculate additional values for the mean curve and merge with the raw precip data from NOAA
+def Mean_Curve_RI_data(raw_precip, Return_Intervals_MC, GEV_parameters_M, GEV_parameters_L, GEV_parameters_U, PMP):
+    Non_Exceedance_Prob = 1-1/Return_Intervals_MC 
+    Precip_additional_M = PPF_GEV(Non_Exceedance_Prob, GEV_parameters_M, PMP)
+    Precip_additional_L = PPF_GEV(Non_Exceedance_Prob, GEV_parameters_L, PMP)
+    Precip_additional_U = PPF_GEV(Non_Exceedance_Prob, GEV_parameters_U, PMP)
+    #
+    Precip_additional = np.vstack((Precip_additional_M, \
+                               Precip_additional_L,Precip_additional_U)).T
+    df1=pd.DataFrame(data=Precip_additional, index= Return_Intervals_MC, \
+                 columns=['Median', 'Lower (90%)', 'Upper (90%)'])  # 
+    df2= pd.concat([raw_precip, df1]).sort_index(kind='mergesort')
+    df2['Log SD (Lower)'] = (np.log(df2['Median'].to_numpy()) - np.log(df2['Lower (90%)'].to_numpy()))/1.645
+    df2['Log SD (Upper)'] = (np.log(df2['Upper (90%)'].to_numpy()) - np.log(df2['Median'].to_numpy()) )/1.645
+    df2['Max Log SD'] = np.maximum(df2['Log SD (Lower)'].to_numpy(), df2['Log SD (Upper)'].to_numpy())
+    df2['mu LN'] = np.log(df2['Median'].to_numpy()) 
+    return df2
+
+##Find GEV parameters for NOAA Data
+
+def GEV_parameters_Fit(raw_precip, ID: str, PMP):
+    #Extract return intervals (in years)
+    year = raw_precip.index.to_numpy()
+    #Weights  of different NOAA Atlas value from the 1 to 1000 year event
+    weights = np.append(1/year[:-1]-1/year[1:], 1/year[-1])
+    Avg   = ( weights*raw_precip[ID]).sum()
+    GEV_parameters   = np.array([Avg*.8 , 0.5, -0.25])
+    bounds   = (( Avg*0.7, Avg*1.0), (.01, 1), (-0.5, 0))
+    df_GEV_parameters=Fit_GEV_Parameters(raw_precip, GEV_parameters, bounds, ID, PMP)
+    return df_GEV_parameters
