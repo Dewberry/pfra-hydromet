@@ -20,7 +20,7 @@ from IPython.display import display, Markdown
 
 import numpy as np
 import pandas as pd
-from scipy import stats
+from scipy import stats, special
 from nptyping import Array
 from scipy.optimize import minimize
 from scipy import interpolate, integrate
@@ -289,7 +289,7 @@ def runoff(Return_Intervals: np.ndarray, RI_upper_bound: float, mu: float, GEV_p
     #Define Runoff as a function of RI based on cubic spline interpolation
     n_partitions_Q = 40 #30 was too little, so increased to 40
     #Determine
-    Q_line = np.linspace(.001, PMP - 0.1, n_partitions_Q+1)
+    Q_line = np.linspace(.001, PMP - 0.001, n_partitions_Q+1)
     Return_PeriodQ= 1/(1- np.transpose([error_PQ + CDF_Q(Q, mu, alpha, beta, S_limit, GEV_parameters, PMP, partition_avg, Delta_P) for Q in Q_line]))
     #Define Runoff as a function of the return interval with a cublic spline interpolation
     tck_RI_Q = interpolate.splrep(Return_PeriodQ, Q_line)
@@ -353,7 +353,7 @@ def Scenarios_Avg_S_Median_S(df_weights_runoff: pd.DataFrame, mu: float, GEV_par
 #Calculate scenarios for high and low maximum potential retention
 def Scenarios_low_and_high_S(df_runoff_SR1: pd.DataFrame, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, alpha: float, beta: float, S_limit: float)->pd.DataFrame:
     weights_runoff = df_runoff_SR1['Event Weight'].to_numpy()
-    Runoff_Q =  df_runoff_SR1['Runoff'].to_numpy()
+    Runoff_Q = df_runoff_SR1['Runoff'].to_numpy()
     Return_Intervals_Q = df_runoff_SR1.index.to_numpy().astype(int)
     Median_S_list = df_runoff_SR1['Median S'].to_numpy()
     Avg_S_Lower50_list = [Avg_SlQ(Q1, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha,beta,S_limit,0,S1)[0]/0.5 for Q1, S1 in zip(Runoff_Q, Median_S_list)]
@@ -367,6 +367,25 @@ def Scenarios_low_and_high_S(df_runoff_SR1: pd.DataFrame, mu: float, GEV_paramet
                                'Event Weight', 'Runoff','Avg. S (Upper 50%)', 'Rainfall'])
     return df_SR2
 
+##########################################
+### Functions for calculating data for input to the mean preicpitation curve calcuation
+##########################################
+
+#Find the mu parameter when the median of the truncated (at the PMP) log normal is equal to the true median value
+def mu_truncated_LN(sigma: float, PMP: float, median: float, Initial_Value: np.ndarray)->float:
+    def objective_mu_LN(mu1: float, sigma: float, PMP: float, median: float)->float:
+        return np.square(median - np.exp(mu1-np.sqrt(2)*sigma*special.erfcinv(1/2*special.erfc((mu1-np.log(PMP))/(np.sqrt(2)*sigma) ) ) ) )
+    return minimize(objective_mu_LN, Initial_Value, \
+                    args = (sigma, PMP, median),\
+                    method='SLSQP', bounds=[(0, Initial_Value*2)], options={ 'disp': False})
+
+#Provides the same output as the previous fucntion.
+def mu_truncated_LN2(sigma: float, PMP: float, median: float, Initial_Value: np.ndarray)->float:
+    def objective_mu_LN(mu1: float, sigma: float, PMP: float, median: float)->float:
+        return np.square(median - stats.lognorm.ppf(0.5/Norm_Constant_LN(sigma, mu1, PMP), sigma, scale = np.exp(mu1) ) )
+    return minimize(objective_mu_LN, Initial_Value, \
+                    args = (sigma, PMP, median),\
+                    method='SLSQP', bounds=[(.001, Initial_Value*2)], options={ 'disp': False})
 
 # Calculate additional values for the mean curve and merge with the raw precip data from NOAA
 def Mean_Curve_RI_data(raw_precip: pd.DataFrame, Return_Intervals_MC: np.ndarray, df_GEV_parameters: pd.DataFrame, PMP: float)->pd.DataFrame:
@@ -386,7 +405,10 @@ def Mean_Curve_RI_data(raw_precip: pd.DataFrame, Return_Intervals_MC: np.ndarray
     df2['Log SD (Lower)'] = (np.log(df2['Median'].to_numpy()) - np.log(df2['Lower (90%)'].to_numpy()))/1.645
     df2['Log SD (Upper)'] = (np.log(df2['Upper (90%)'].to_numpy()) - np.log(df2['Median'].to_numpy()) )/1.645
     df2['Max Log SD'] = np.maximum(df2['Log SD (Lower)'].to_numpy(), df2['Log SD (Upper)'].to_numpy())
-    df2['mu LN'] = np.log(df2['Median'].to_numpy()) 
+    median = df2['Median'].to_numpy()
+    mu_LN =np.log(df2['Median'].to_numpy()) 
+    SD = df2['Max Log SD'].to_numpy()
+    df2['mu LN'] = [mu_truncated_LN(SD1, PMP, median1, np.array([mu1])).x[0] for median1, mu1, SD1 in zip(median, mu_LN, SD)]
     return df2
 
 ##Find GEV parameters for NOAA Data
@@ -401,6 +423,7 @@ def GEV_parameters_Fit(raw_precip: pd.DataFrame, ID: str, PMP: float)->pd.DataFr
     bounds   = (( Avg*0.7, Avg*1.0), (.01, 1), (-0.5, 0))
     df_GEV_parameters=Fit_GEV_Parameters(raw_precip, GEV_parameters, bounds, ID, PMP)
     return df_GEV_parameters
+
 
 ################################
 ##### Plotting Functions
