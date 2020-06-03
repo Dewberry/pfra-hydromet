@@ -41,6 +41,7 @@ from scipy.integrate import quad
 from scipy import optimize
 
 
+WindowsPath = 'WindowsPath'
 #---------------------------------------------------------------------------#
 
 '''Functions called by EventTable_Stratified.ipynb. 
@@ -74,7 +75,7 @@ def CDF_GEV(R, x: np.ndarray, PMP: float)-> float:
 def PPF_GEV(P, x: np.ndarray, PMP: float)-> float:
     return stats.genextreme.ppf(P/Norm_Constant_GEV(x, PMP) ,x[2], x[0], x[1])
 
-def Fit_GEV_Parameters(df: pd.DataFrame, GEV_Parameters: np.ndarray, bounds, ID: str, PMP: float)->pd.DataFrame:
+def GEV_Parameters(df: pd.DataFrame, GEV_Parameters: np.ndarray, bounds, ID: str, PMP: float)->pd.DataFrame:
     def objective_func_GEV(x: np.ndarray)-> float: 
         ''''Calculates the sum of the squared residuals between the return interval
         and return interval calculated from the GEV CDF with the differences
@@ -87,6 +88,21 @@ def Fit_GEV_Parameters(df: pd.DataFrame, GEV_Parameters: np.ndarray, bounds, ID:
     solution = minimize(objective_func_GEV, GEV_Parameters, method='SLSQP', bounds=bounds, options={ 'disp': True})
     df_GEV_parameters=pd.DataFrame(data=solution.x, index=["mu", "sigma", "xi"], columns=["GEV {}".format(ID)])
     return df_GEV_parameters
+
+
+##Find GEV parameters for NOAA Data
+
+def GEV_parameters_Fit(raw_precip: pd.DataFrame, ID: str, PMP: float)->pd.DataFrame:
+    #Extract return intervals (in years)
+    year = raw_precip.index.to_numpy()
+    #Weights  of different NOAA Atlas value from the 1 to 1000 year event
+    weights = np.append(1/year[:-1]-1/year[1:], 1/year[-1])
+    Avg   = ( weights*raw_precip[ID]).sum()
+    GEV_parameters   = np.array([Avg*.8 , 0.5, -0.25])
+    bounds   = (( Avg*0.7, Avg*1.0), (.01, 1), (-0.5, 0))
+    df_GEV_parameters = GEV_Parameters(raw_precip, GEV_parameters, bounds, ID, PMP)
+    return df_GEV_parameters
+
 
 
 def Avg_R_integrand(R: float, GEV_parameters: np.ndarray, PMP: float)-> float:
@@ -371,24 +387,13 @@ def Scenarios_low_and_high_S(df_runoff_SR1: pd.DataFrame, mu: float, GEV_paramet
 ### Functions for calculating data for input to the mean preicpitation curve calcuation
 ##########################################
 
-#Find the mu parameter when the median of the truncated (at the PMP) log normal is equal to the true median value
-def mu_truncated_LN(sigma: float, PMP: float, median: float, Initial_Value: np.ndarray)->float:
-    def objective_mu_LN(mu1: float, sigma: float, PMP: float, median: float)->float:
-        return np.square(median - np.exp(mu1-np.sqrt(2)*sigma*special.erfcinv(1/2*special.erfc((mu1-np.log(PMP))/(np.sqrt(2)*sigma) ) ) ) )
-    return minimize(objective_mu_LN, Initial_Value, \
-                    args = (sigma, PMP, median),\
-                    method='SLSQP', bounds=[(0, Initial_Value*2)], options={ 'disp': False})
-
-#Provides the same output as the previous fucntion.
-def mu_truncated_LN2(sigma: float, PMP: float, median: float, Initial_Value: np.ndarray)->float:
-    def objective_mu_LN(mu1: float, sigma: float, PMP: float, median: float)->float:
-        return np.square(median - stats.lognorm.ppf(0.5/Norm_Constant_LN(sigma, mu1, PMP), sigma, scale = np.exp(mu1) ) )
-    return minimize(objective_mu_LN, Initial_Value, \
-                    args = (sigma, PMP, median),\
-                    method='SLSQP', bounds=[(.001, Initial_Value*2)], options={ 'disp': False})
-
-# Calculate additional values for the mean curve and merge with the raw precip data from NOAA
-def Mean_Curve_RI_data(raw_precip: pd.DataFrame, Return_Intervals_MC: np.ndarray, df_GEV_parameters: pd.DataFrame, PMP: float)->pd.DataFrame:
+def return_interval_data(raw_precip: pd.DataFrame, Return_Intervals_MC: np.ndarray, df_GEV_parameters: pd.DataFrame, PMP: float)->pd.DataFrame:
+    '''Calculates the additional precipitation values for RI not in the original NOAA data.
+        The additional precipitation value are merged with the NOAA data. In addition
+        For each RI, the parameters are calculated for a log-normal distribution that
+        represents the variability (uncertainty) of precipitation based on the 90-percent
+        confidence interval retreived from the NOAA data.
+    '''
     Non_Exceedance_Prob = 1-1/Return_Intervals_MC 
     GEV_parameters_M = df_GEV_parameters['GEV Median'].to_numpy()
     GEV_parameters_L = df_GEV_parameters['GEV Lower (90%)'].to_numpy()
@@ -411,38 +416,152 @@ def Mean_Curve_RI_data(raw_precip: pd.DataFrame, Return_Intervals_MC: np.ndarray
     df2['mu LN'] = [mu_truncated_LN(SD1, PMP, median1, np.array([mu1])).x[0] for median1, mu1, SD1 in zip(median, mu_LN, SD)]
     return df2
 
-##Find GEV parameters for NOAA Data
+#Find the mu parameter when the median of the truncated (at the PMP) log normal is equal to the true median value
+def mu_truncated_LN(sigma: float, PMP: float, median: float, Initial_Value: np.ndarray)->float:
+    def objective_mu_LN(mu1: float, sigma: float, PMP: float, median: float)->float:
+        return np.square(median - np.exp(mu1-np.sqrt(2)*sigma*special.erfcinv(1/2*special.erfc((mu1-np.log(PMP))/(np.sqrt(2)*sigma) ) ) ) )
+    return minimize(objective_mu_LN, Initial_Value, \
+                    args = (sigma, PMP, median),\
+                    method='SLSQP', bounds=[(0, Initial_Value*2)], options={ 'disp': False})
 
-def GEV_parameters_Fit(raw_precip: pd.DataFrame, ID: str, PMP: float)->pd.DataFrame:
-    #Extract return intervals (in years)
-    year = raw_precip.index.to_numpy()
-    #Weights  of different NOAA Atlas value from the 1 to 1000 year event
-    weights = np.append(1/year[:-1]-1/year[1:], 1/year[-1])
-    Avg   = ( weights*raw_precip[ID]).sum()
-    GEV_parameters   = np.array([Avg*.8 , 0.5, -0.25])
-    bounds   = (( Avg*0.7, Avg*1.0), (.01, 1), (-0.5, 0))
-    df_GEV_parameters=Fit_GEV_Parameters(raw_precip, GEV_parameters, bounds, ID, PMP)
-    return df_GEV_parameters
+#Provides the same output as the previous fucntion.
+def mu_truncated_LN2(sigma: float, PMP: float, median: float, Initial_Value: np.ndarray)->float:
+    def objective_mu_LN(mu1: float, sigma: float, PMP: float, median: float)->float:
+        return np.square(median - stats.lognorm.ppf(0.5/Norm_Constant_LN(sigma, mu1, PMP), sigma, scale = np.exp(mu1) ) )
+    return minimize(objective_mu_LN, Initial_Value, \
+                    args = (sigma, PMP, median),\
+                    method='SLSQP', bounds=[(.001, Initial_Value*2)], options={ 'disp': False})
+
+
+def mean_curve_input_table(CL: np.ndarray, return_interval_data: pd.DataFrame,  PMP: float, outputs_dir: WindowsPath, Project_Area:str, Pluvial_Model:str, BCN:str)->pd.DataFrame:
+    '''This functions takes the return interval data and creates an input table of 
+        values for calculating the mean curve. The function returns a table of precipitation 
+        value for the different AEP and confidence limits (CL) based on a lognormal distribution
+        that represents the variability of precipitation based on the 90-percent confidence interval 
+        limits provided by NOAA Atlas 14.
+    '''
+    mu_LN = return_interval_data['mu LN'].to_numpy()
+    SD = return_interval_data['Max Log SD'].to_numpy()
+    
+    data= [[stats.lognorm.ppf(CL1/Norm_Constant_LN(SD1, mu1, PMP), SD1, scale = np.exp(mu1) )  for CL1 in CL ] for mu1, SD1 in zip(mu_LN, SD) ]
+    df_input = pd.DataFrame(data=data, columns = CL, index =  1/return_interval_data.index.to_numpy()).sort_index(axis=0 ,ascending=True)
+    df_input.index.name ='AEP'
+    df_input = df_input.drop([1]) # drop last n rows#Drop the last row with the one year value
+    df_input.to_csv(outputs_dir/'Mean_Curve_Input_{0}_{1}_{2}.csv'.format(Project_Area, Pluvial_Model, BCN))
+    return df_input
+
 
 
 ################################
 ##### Plotting Functions
 ################################
 
-def plot_grouped_curves(final_curves: dict, y_max: float, 
-                                        iplot: bool=False) -> plt.subplots:
-    '''Plots the mean curve of each group of curves determined using the 
-       convolution test as well as the curves that were not grouped. 
-    '''
-    fig, ax = plt.subplots(figsize=(30,8))
-    for col in final_curves.columns:
-        ax.plot(final_curves[col]);
-    ax.grid()
-    ax.set_xlabel('Duration, [hours]')
-    ax.set_ylabel('Runoff, [inches]')
-    ax.set_ylim(0, y_max*1.1)
-    ax.set_title('{} Temporal Curves'.format(final_curves.shape[1]))
-    if iplot:
-        plt.close(fig)
-    return fig
 
+def plot_GEV_precip_curves(precip_data, df_GEV_parameters, PMP)-> plt.subplots:
+    '''This functions plots the GEV distributions and also associated GEV return frequency curves 
+    on top of the precpitation curve data taken either from NOAA Atlas 14 or from the 
+    mean precipitation curve output.
+    '''
+    fig, ((fig1a, fig1b)) = plt.subplots(nrows=1, ncols=2,figsize=(10,4))
+    fig1a.set_xlabel('Rainfall, inches'),fig1a.set_ylabel('GEV PDF $p_R(R)$'), fig1a.set_title('24-hour Rainfall')
+    fig1b.set_xscale('log')
+    fig1b.set_xlabel('Return Period (years)'),fig1b.set_ylabel('Rainfall, inches'), fig1b.set_title('24-hour Rainfall')
+    color = ['r','k','k','k']
+
+    # Yields a tuple of column name and series for each column in the dataframe
+    GEV_parameters = np.zeros(shape = (df_GEV_parameters.shape[1], df_GEV_parameters.shape[0]))
+    Return_Period =  np.zeros(shape = (df_GEV_parameters.shape[1], 100))
+    Precip        =  np.zeros(shape = (df_GEV_parameters.shape[1], 100))
+    for (i, (columnName, columnData)) in enumerate(df_GEV_parameters.iteritems()):
+        GEV_parameters[i] = df_GEV_parameters[columnName].to_numpy().transpose()
+        Precip[i] = np.linspace(PPF_GEV(10**-100, GEV_parameters[i], PMP), PPF_GEV(.999999, GEV_parameters[i], PMP), 100)
+        Return_Period[i] = 1/(1-CDF_GEV(Precip[i],  GEV_parameters[i] , PMP))
+        fig1a.plot(Precip[i], PDF_GEV(Precip[i], GEV_parameters[i], PMP) ,
+        color[i] , lw=2, alpha=0.6, label='genextreme pdf')
+        fig1b.plot(Return_Period[i], Precip[i],
+        color[i], lw=2.5, alpha=0.6, label='genextreme pdf')
+    
+    for (columnName, columnData) in precip_data.iteritems():
+        precip_data[columnName].plot(style=['+-','o-','.--','s:'],logx=True)
+
+#Plots the distribution of runoff conditional on the max. potential retention and plots the distribution of the max. potential reten        
+def plot_runoff_maxRetention_distributions(GEV_parameters_E: np.ndarray, PMP:float, fitted_cn: pd.DataFrame)-> plt.subplots:
+    custom_cycler = cycler('color', ['.1', '.25', '.4', '.55']) + cycler('lw', [1, 1, 1, 1])
+    
+    S_limit = 1000/fitted_cn.iloc[0]['CN Lower Limit']-10
+    alpha = fitted_cn.iloc[0]['alpha']
+    beta = fitted_cn.iloc[0]['beta']
+    mu = fitted_cn.iloc[0]['mu']
+    Q = np.linspace(PPF_GEV(10**-100, GEV_parameters_E, PMP), PPF_GEV(0.99, GEV_parameters_E, PMP), 100)
+    S = np.linspace(0, S_limit, 100)
+    
+    fig, ((fig2a, fig2b)) = plt.subplots(nrows=1, ncols=2,figsize=(10,4))
+    
+    fig2a.set_prop_cycle(custom_cycler)
+    SA=np.linspace(.1, 3.5 , 5)
+    fig2a.plot(Q, np.transpose([PDF_QlS(Q, S1, mu, GEV_parameters_E, PMP) for S1 in SA]))
+    fig2a.grid(linestyle='--')
+    fig2a.set_ylim((0, 1.1))
+    fig2a.set_xlabel('Runoff, Q (inches)'),fig2a.set_ylabel('$p_Q(Q | S)$'), fig2a.set_title('Conditional Runoff Distribution')
+
+    #Plot Figure 2b
+    fig2b.set_prop_cycle(custom_cycler)
+    SA=np.linspace(.1, 3.5 , 5)
+    fig2b.plot(S, (1/S_limit)*stats.beta(alpha, beta).pdf(S/S_limit))
+    fig2b.grid(linestyle='--')
+    #fig2b.set_ylim((0, 1.1))
+    fig2b.set_xlabel('Max. Potential Retention, S (inches)'),fig2b.set_ylabel('$p_S(S)$'), fig2b.set_title('Max. Potential Retention Distribution')
+
+    plt.tight_layout()
+    plt.show()
+    
+
+def plot_runoff_distributions_final(GEV_parameters_E: np.ndarray, PMP:float, fitted_cn: pd.DataFrame, partition_avg: np.ndarray, Delta_P: float, tck_RI_Q)-> plt.subplots:
+    mu = fitted_cn.iloc[0]['mu']
+    Q1= np.linspace(.01, 6, 1000)
+    Return_PeriodQ = np.linspace(1, 10**5.4, 100000)
+    Precip = np.linspace(PPF_GEV(10**-100, GEV_parameters_E, PMP), PPF_GEV(.999999, GEV_parameters_E, PMP), 100)
+    Return_Period = 1/(1-CDF_GEV(Precip,  GEV_parameters_E , PMP))
+ 
+    fig, ((fig3a, fig3b)) = plt.subplots(nrows=1, ncols=2,figsize=(10,4))
+    
+    custom_cycler = cycler('color', ['.1', '.25', '.4', '.55']) + cycler('lw', [1, 1, 1, 1])
+    
+    fig3a.set_prop_cycle(custom_cycler)
+    fig3a.grid(linestyle='--')
+    fig3a.set_xlabel('Runoff, Q (inches)'),fig3a.set_ylabel('$p_Q(Q)$'), fig3a.set_title('Runoff Distribution')
+    fig3a.plot(Q1,PDF_Q(Q1, mu, GEV_parameters_E, PMP, partition_avg, Delta_P))
+  
+    fig3b.set_xscale('log')
+    fig3b.set_prop_cycle(custom_cycler)
+    fig3b.grid(linestyle='--')
+    fig3b.set_ylim((0, PMP))
+    fig3b.set_xlabel('Runoff, Q (inches)'), fig3b.set_ylabel('Rainfall (red) and Runoff (gray), inches$'), fig3b.set_title('24-hour Event')
+    fig3b.plot(Return_PeriodQ, interpolate.splev(Return_PeriodQ, tck_RI_Q, der=0), 'b', lw =2.9, alpha=.45)
+    fig3b.plot(Return_Period, Precip, 'r-', lw=5, alpha=0.6, label='genextreme pdf')
+    
+    plt.tight_layout()
+    plt.show()
+    
+def plot_max_potential_retention_cond_runoff(GEV_parameters_E: np.ndarray, PMP:float, fitted_cn: pd.DataFrame,  partition_avg: np.ndarray, Delta_P: float):
+ 
+    S_limit = 1000/fitted_cn.iloc[0]['CN Lower Limit']-10
+    alpha = fitted_cn.iloc[0]['alpha']
+    beta = fitted_cn.iloc[0]['beta']
+    mu = fitted_cn.iloc[0]['mu']
+
+    S1= np.linspace(.01, S_limit, 1000)
+    S2= np.linspace(.01, S_limit, 10)
+
+    fig, (fig4) = plt.subplots(nrows=1, ncols=1,figsize=(10,7))
+    custom_cycler = cycler('color', ['.1', '.25', '.4', '.55']) + cycler('lw', [1, 1, 1, 1])
+
+    fig4.set_prop_cycle(custom_cycler)
+    QA=np.linspace(.5, 10 , 50)
+    fig4.plot(S1, np.transpose([PDF_SlQ(S1, Q1, mu, GEV_parameters_E, PMP, partition_avg, Delta_P, alpha, beta, S_limit) for Q1 in QA]))
+    fig4.grid(linestyle='--')
+    fig4.set_ylim((0, .45))
+    fig4.set_xlabel('Max. Potential Retention, S (inches)'),fig4.set_ylabel('$p_S(S | Q)$'), fig4.set_title('Conditional Max. Potential Retention Distribution')
+
+    plt.tight_layout()
+    plt.show()
