@@ -317,7 +317,7 @@ def weights_Rainfall(Return_Intervals: np.ndarray, GEV_parameters: np.ndarray, P
     #dataframe of input values
     df_R_NOAA_E =  NOAA_precip[ NOAA_precip.index.isin(RI_data) ]    #NOT USED pd.DataFrame(NOAA_precip.loc[RI_NOAA_L : RI_NOAA_U][ID])
     df_precip = df_R_NOAA_E.append(df2)
-    df_precip = df_precip.drop('Median',axis=1)
+    df_precip = df_precip.drop('P_Median_in',axis=1)
     #Calculate the runoff
     Q = Q_SCS( df_precip[ID].to_numpy(), CN, mu)
     #append Runoff to the table
@@ -462,7 +462,7 @@ def mu_truncated_LN2(sigma: float, PMP: float, median: float, Initial_Value: np.
                     method='SLSQP', bounds=[(.001, Initial_Value*2)], options={ 'disp': False})
 
 
-def mean_curve_input_table(CL: np.ndarray, return_interval_data: pd.DataFrame,  PMP: float, outputs_dir: WindowsPath, Project_Area:str, Pluvial_Model:str, BCN:str)->pd.DataFrame:
+def mean_curve_input_table(CL: np.ndarray, return_interval_data: pd.DataFrame,  PMP: float, outputs_dir: WindowsPath, Project_Area:str, Pluvial_Model:str, BCN:str, output_dir: str = '')->pd.DataFrame:
     '''This functions takes the return interval data and creates an input table of 
         values for calculating the mean curve. The function returns a table of precipitation 
         value for the different AEP and confidence limits (CL) based on a lognormal distribution
@@ -476,7 +476,7 @@ def mean_curve_input_table(CL: np.ndarray, return_interval_data: pd.DataFrame,  
     df_input = pd.DataFrame(data=data, columns = CL, index =  1/return_interval_data.index.to_numpy()).sort_index(axis=0 ,ascending=True)
     df_input.index.name ='AEP'
     df_input = df_input.drop([1]) # drop last n rows#Drop the last row with the one year value
-    df_input.to_csv(outputs_dir/'Mean_Curve_Input_{0}_{1}_{2}.csv'.format(Project_Area, Pluvial_Model, BCN))
+    df_input.to_csv(output_dir/'Mean_Curve_Input_{0}_{1}_{2}.csv'.format(Project_Area, Pluvial_Model, BCN))
     return df_input
 
 
