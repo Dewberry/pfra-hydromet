@@ -101,11 +101,9 @@ def GEV_parameters_Fit(raw_precip: pd.DataFrame, ID: str, PMP: float)->pd.DataFr
     weights = np.append(1/year[:-1]-1/year[1:], 1/year[-1])
     Avg   = ( weights*raw_precip[ID]).sum()
     GEV_parameters   = np.array([Avg*.8 , 0.5, -0.25])
-    bounds   = (( Avg*0.7, Avg*1.0), (.01, 1), (-0.5, 0))
+    bounds   = (( Avg*0.7, Avg*1.0), (.01, 1.1), (-0.5, 0))
     df_GEV_parameters = GEV_Parameters(raw_precip, GEV_parameters, bounds, ID, PMP)
     return df_GEV_parameters
-
-
 
 def Avg_R_integrand(R: float, GEV_parameters: np.ndarray, PMP: float)-> float:
     '''This function defines the integrand for calculating an average
@@ -120,32 +118,32 @@ def Avg_R(lower_bound: float, upper_bound: float, GEV_parameters: np.ndarray, PM
     return quad(Avg_R_integrand, lower_bound, upper_bound, args=(GEV_parameters, PMP))
 
 
-def rainfal_RI(RI: float, GEV_parameters: np.ndarray, PMP: float)-> float:
+def GEV_RI(RI: float, GEV_parameters: np.ndarray, PMP: float)-> float:
     '''Provides rainfall as a function of the return interval (RI)
     '''
     return PPF_GEV( 1-1/RI, GEV_parameters, PMP)
 
-def objective_func_bound_rainfall(RI_lower: float, RI_upper: float, RI_middle: float, GEV_parameters: np.ndarray, PMP: float)->float:
+def objective_func_bound_GEV(RI_lower: float, RI_upper: float, RI_middle: float, GEV_parameters: np.ndarray, PMP: float)->float:
     ''''Calculates the square of the error between the average rainfall
         calculated form the bin floor and ceiling (given in terms of RI)
         and the raifall of the return period of interest
      ''' 
-    return (np.square(Avg_R( rainfal_RI(RI_lower, GEV_parameters, PMP), rainfal_RI(RI_upper, GEV_parameters, PMP), GEV_parameters, PMP)[0] \
-                      /(1.0/RI_lower-1.0/RI_upper) - rainfal_RI(RI_middle, GEV_parameters, PMP) ) )
+    return (np.square(Avg_R( GEV_RI(RI_lower, GEV_parameters, PMP), GEV_RI(RI_upper, GEV_parameters, PMP), GEV_parameters, PMP)[0] \
+                      /(1.0/RI_lower-1.0/RI_upper) - GEV_RI(RI_middle, GEV_parameters, PMP) ) )
 
 
-def Bound_rainfall_L(RI_upper: float, RI_middle: float, GEV_parameters: np.ndarray, initial_value: np.ndarray, PMP: float)-> float:
+def bound_lower_GEV(RI_upper: float, RI_middle: float, GEV_parameters: np.ndarray, initial_value: np.ndarray, PMP: float)-> float:
     '''Finds the rainfall bin floor given the bin ceiling and average return interval of the bin
     '''
-    return minimize(objective_func_bound_rainfall, initial_value, \
+    return minimize(objective_func_bound_GEV, initial_value, \
                     args = (RI_upper, RI_middle, GEV_parameters, PMP),\
-                    method='SLSQP',bounds= [(1.0, RI_upper)], options={ 'disp': False})
+                    method='SLSQP',bounds= [(1.0, RI_upper*.999)], options={ 'disp': False})
 
 
 def Bound_rainfall_U(RI_lower: float, RI_middle: float, GEV_parameters: np.ndarray, initial_value: np.ndarray)-> float:
     '''Finds the rainfall bin ceiling given the bin floor and average return interval of the bin
     '''
-    return minimize(objective_func_bound_rainfall, initial_value, \
+    return minimize(objective_func_bound_GEV, initial_value, \
                     args = (RI_lower, RI_middle, GEV_parameters),\
                     method='SLSQP', bounds = [(1.0, RI_upper_bound)], options={ 'disp': False})
 
@@ -160,53 +158,53 @@ def PDF_QlS(Q: float, S: float, mu: float, GEV_parameters: np.ndarray, PMP: floa
 
 #The runoff distribution consists of a continuous part plus a discrete probablity of zero runoff
 #The continuous runoff distribution
-def PDF_Q(Q: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float)-> float: 
-    return sum(Delta_P*PDF_QlS(Q, S_avg_partition, mu, GEV_parameters, PMP) for S_avg_partition in partition_avg)
+def PDF_Q(Q: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, error_PQ:float)-> float: 
+    return sum(Delta_P*PDF_QlS(Q, S_avg_partition, mu, GEV_parameters, PMP) for S_avg_partition in partition_avg)/(1-error_PQ)
 
 
-def Qzero_integrand(S: float, mu: float, alpha: float, beta: float, S_limit: float, GEV_parameters: np.ndarray, PMP: float)-> float:
+def Qzero_integrand(S: float, mu: float, alpha: float, beta: float, S_limit: float, GEV_parameters: np.ndarray, PMP: float, error_PQ:float )-> float:
     '''Defines the integrand for calculating the probability of zero runoff'''
     return ( CDF_GEV(S*mu, GEV_parameters, PMP) \
             -CDF_GEV(0, GEV_parameters, PMP)) \
-            *(1/S_limit)*stats.beta(alpha, beta).pdf(S/S_limit)
+            *(1/S_limit)*stats.beta(alpha, beta).pdf(S/S_limit)/(1-error_PQ)
 
-def P_Qzero(mu: float, alpha: float, beta: float, S_limit: float, GEV_parameters: np.ndarray, PMP: float)-> float:
+def P_Qzero(mu: float, alpha: float, beta: float, S_limit: float, GEV_parameters: np.ndarray, PMP: float, error_PQ:float)-> float:
     '''Defines discrete probabilility of zero runoff (integrated)'''
-    return quad(Qzero_integrand, 0, S_limit, args =(mu, alpha, beta, S_limit, GEV_parameters, PMP)) 
+    return quad(Qzero_integrand, 0, S_limit, args =(mu, alpha, beta, S_limit, GEV_parameters, PMP, error_PQ)) 
 
 
-def CDF_Q(Q: float, mu: float, alpha: float, beta: float, S_limit: float, GEV_parameters: np.ndarray, PMP: float,  partition_avg: np.ndarray, Delta_P: float)-> float:
+def CDF_Q(Q: float, mu: float, alpha: float, beta: float, S_limit: float, GEV_parameters: np.ndarray, PMP: float,  partition_avg: np.ndarray, Delta_P: float, error_PQ:float)-> float:
     '''Defines the cumulative distribution function for runoff
         PDF PDF_Q(u) is integrated from zero to an arbitrary runoff Q.
     '''
-    return quad(PDF_Q, 0, Q, args=(mu,  GEV_parameters, PMP, partition_avg, Delta_P))[0]\
-                +P_Qzero(mu, alpha, beta, S_limit, GEV_parameters, PMP)[0]
+    return quad(PDF_Q, 0, Q, args=(mu,  GEV_parameters, PMP, partition_avg, Delta_P, error_PQ))[0]\
+                +P_Qzero(mu, alpha, beta, S_limit, GEV_parameters, PMP,  error_PQ)[0]
 
-def Avg_Q_integrand(Q: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float)-> float:
-    return Q*PDF_Q(Q, mu, GEV_parameters, PMP, partition_avg, Delta_P)
+def Avg_Q_integrand(Q: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, error_PQ:float)-> float:
+    return Q*PDF_Q(Q, mu, GEV_parameters, PMP, partition_avg, Delta_P,  error_PQ)
 
-def Avg_Q(lower_bound: float, upper_bound: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float)-> float:
-    return quad(Avg_Q_integrand, lower_bound, upper_bound, args=(mu, GEV_parameters, PMP, partition_avg, Delta_P))
+def Avg_Q(lower_bound: float, upper_bound: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float,  error_PQ: float)-> float:
+    return quad(Avg_Q_integrand, lower_bound, upper_bound, args=(mu, GEV_parameters, PMP, partition_avg, Delta_P, error_PQ))
 
 def runoff_RI(RI: float, f_RI_Q)-> float:
     '''Defines runoff as a function of the return interval (RI)'''
     return f_RI_Q(RI)
 
-def objective_func_bound_runoff_L(RI_lower: float, RI_upper: float, RI_middle: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, f_RI_Q)-> float:
+def objective_func_bound_runoff_L(RI_lower: float, RI_upper: float, RI_middle: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, f_RI_Q,  error_PQ:float)-> float:
     ''''Calculates the square of the error between the average runoff
         calculated form the bin floor and ceiling (given in terms of RI)
         and the runoff of the return period of interest
      ''' 
     return (np.square(Avg_Q( runoff_RI(RI_lower, f_RI_Q), runoff_RI(RI_upper,  f_RI_Q), mu, \
-                            GEV_parameters, PMP, partition_avg, Delta_P)[0]/(1.0/RI_lower -1.0/RI_upper) \
+                            GEV_parameters, PMP, partition_avg, Delta_P, error_PQ)[0]/(1.0/RI_lower -1.0/RI_upper) \
                       - runoff_RI(RI_middle, f_RI_Q) ) )
 
-def Bound_L(RI_upper: float, RI_middle: float, mu: float, GEV_parameters: np.ndarray, PMP, partition_avg: np.ndarray, Delta_P: float, initial_value: np.ndarray, f_RI_Q)-> float:
+def Bound_L(RI_upper: float, RI_middle: float, mu: float, GEV_parameters: np.ndarray, PMP, partition_avg: np.ndarray, Delta_P: float, initial_value: np.ndarray, f_RI_Q, error_PQ:float)-> float:
     '''Calculates runoff bin floor given the bin ceiling and average return interval of the bin
     '''
     return minimize(objective_func_bound_runoff_L, initial_value, \
                     args = (RI_upper, RI_middle, mu, GEV_parameters, PMP,\
-                            partition_avg, Delta_P, f_RI_Q),\
+                            partition_avg, Delta_P, f_RI_Q, error_PQ),\
                     method='SLSQP',bounds= [(1.0, RI_upper)], options={ 'disp': False})
 
 
@@ -227,41 +225,41 @@ def S_avg_partition(alpha: float, beta: float, S_limit: float, lower_bound: floa
     return quad(S_avg_integrand, lower_bound, upper_bound, args=(alpha, beta, S_limit))
 
 
-def PDF_SlQ(S: float, Q: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, alpha: float, beta: float, S_limit: float)-> float:
+def PDF_SlQ(S: float, Q: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, alpha: float, beta: float, S_limit: float, error_PQ:float)-> float:
     '''Defines the PDF of the max. potential retention, S, conditional
     on runoff, Q.
     '''
-    return PDF_QlS(Q, S, mu, GEV_parameters, PMP)*PDF_S(S, alpha, beta, S_limit)/PDF_Q(Q, mu,  GEV_parameters, PMP, partition_avg, Delta_P)
+    return PDF_QlS(Q, S, mu, GEV_parameters, PMP)*PDF_S(S, alpha, beta, S_limit)/PDF_Q(Q, mu,  GEV_parameters, PMP, partition_avg, Delta_P, error_PQ)
 
-def CDF_SlQ(S: float, Q: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, alpha: float, beta: float, S_limit: float)-> float:
+def CDF_SlQ(S: float, Q: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, alpha: float, beta: float, S_limit: float, error_PQ:float)-> float:
     '''Defines the CDF of the max potential retention, S, conditional
     on runoff Q.
     '''
-    return quad(PDF_SlQ, 0, S, args=(Q, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha, beta, S_limit))[0]
+    return quad(PDF_SlQ, 0, S, args=(Q, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha, beta, S_limit, error_PQ))[0]
 
-def Avg_S1Q_integrand(S: float, Q: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, alpha: float, beta: float, S_limit: float)-> float:
+def Avg_S1Q_integrand(S: float, Q: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, alpha: float, beta: float, S_limit: float, error_PQ:float)-> float:
     '''Defines the integrand for calculating the average 
     max potential retention
     '''
-    return S*PDF_SlQ(S, Q, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha, beta, S_limit)
+    return S*PDF_SlQ(S, Q, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha, beta, S_limit, error_PQ)
 
-def Avg_SlQ(Q: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, alpha: float, beta: float, S_limit: float, lower_bound: float, upper_bound: float)-> float:
+def Avg_SlQ(Q: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, alpha: float, beta: float, S_limit: float,  error_PQ:float, lower_bound: float, upper_bound: float)-> float:
     '''Derives the average values of the max potential retention by integrating
     between an upper and lower bound.
     '''
-    return quad(Avg_S1Q_integrand, lower_bound, upper_bound, args=(Q, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha, beta, S_limit))
+    return quad(Avg_S1Q_integrand, lower_bound, upper_bound, args=(Q, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha, beta, S_limit, error_PQ))
 
 #Find the Median Value of S, i.e., the max potential retention, given a value of runoff
-def objective_func_median_S(S: float, Q: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, alpha: float, beta: float, S_limit: float)-> float:
+def objective_func_median_S(S: float, Q: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, alpha: float, beta: float, S_limit: float, error_PQ:float)-> float:
     ''''Calculates the square of the error between the the CDF value
         and the median value of 0.5
      ''' 
-    return np.square(CDF_SlQ(S, Q, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha, beta, S_limit)-0.5)
+    return np.square(CDF_SlQ(S, Q, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha, beta, S_limit, error_PQ)-0.5)
 
-def Median_S(Q: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, alpha: float, beta: float, S_limit: float, bounds: list, Initial_Value: np.ndarray)-> float:
+def Median_S(Q: float, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, alpha: float, beta: float, S_limit: float, error_PQ:float, bounds: list, Initial_Value: np.ndarray)-> float:
     print('Calculating Median S for Runoff = %s' %(Q))
     return minimize(objective_func_median_S, Initial_Value, \
-                    args = (Q, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha, beta, S_limit),\
+                    args = (Q, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha, beta, S_limit, error_PQ),\
                     method='SLSQP',bounds=bounds, options={ 'disp': False})
 
 #
@@ -287,7 +285,7 @@ def weights_Rainfall(Return_Intervals: np.ndarray, GEV_parameters: np.ndarray, P
     Bin_Bounds_R_topdown[Size] = RI_upper_bound
     for i in range(0, Size):
         Bin_Bounds_R_topdown[Size-i-1] = \
-        Bound_rainfall_L(Bin_Bounds_R_topdown[Size-i], \
+        bound_lower_GEV(Bin_Bounds_R_topdown[Size-i], \
                          Return_Intervals[Size-i-1], \
                          GEV_parameters, \
                          np.array([ Return_Intervals[Size-i-1]*.2 ]), \
@@ -308,8 +306,7 @@ def weights_Rainfall(Return_Intervals: np.ndarray, GEV_parameters: np.ndarray, P
                  weights_R_topdown)).T
     df_weights =  pd.DataFrame(data=data, index=RI_index, \
                            columns=['Bin Floor', 'Bin Celing','Event Weight']) 
-    #Based on GEV  calculate the  precipitation for each RI
-    
+    #Based on GEV  calculate the  precipitation for each RI  
     RI_index_calc = RI_index[ np.isin(RI_index, RI_data, invert=True) ]
     Precip_calculate = PPF_GEV(1-1/RI_index_calc, GEV_parameters, PMP)
     
@@ -325,78 +322,83 @@ def weights_Rainfall(Return_Intervals: np.ndarray, GEV_parameters: np.ndarray, P
     df_precip['Runoff'] = Q 
     return pd.concat([df_weights,  df_precip], axis=1)
 
-
-def runoff(Return_Intervals: np.ndarray, RI_upper_bound: float, mu: float, GEV_parameters, PMP: float, \
+def runoff_GEV(mu: float, GEV_parameters, PMP: float, \
            alpha: float, beta: float, S_limit: float, partition_avg: np.ndarray, Delta_P: float, \
-           error_PQ: float, n_partitions_Q: int=60 )->tuple:
-    '''Calculate runoff and runoff probability weights and returns a dataframe
-    of runoff values and runoff weights. The function also returns
-    funoff as a function of RI based on cubic spline interpolation and 
-    RI as a function of RI based on a cubic spline interpolation. 
+           error_PQ: float, n_partitions_Q: int=40 )->tuple:
+    '''The function calculates the values of runoff versus return period and
+    fits a GEV distribution to the resuts and returns datarames for both the GEV parameters
+    and runoff as a function of the return interval.
     '''
-    
-    Q_line = np.linspace(.001, PMP - 0.001, n_partitions_Q+1)
-    Return_PeriodQ= 1/(1- np.transpose([CDF_Q(Q, mu, alpha, beta, S_limit, GEV_parameters, PMP, partition_avg, Delta_P)/(1-error_PQ) for Q in Q_line]))
-    #Define Runoff as a function of the return interval with a cublic spline interpolation
-    f_RI_Q = interpolate.interp1d(Return_PeriodQ, Q_line, kind='cubic') #interpolate.splrep(Return_PeriodQ, Q_line)
-    #Define return interval as a function of the runoffl with a cublic spline interpolation
-    f_Q_RI = interpolate.interp1d(Q_line, Return_PeriodQ, kind='cubic') #interpolate.splrep(Q_line, Return_PeriodQ)
-    #interp1d(x, y, kind='cubic') #tck
+    Q_line = np.linspace(.01, PMP-.01, n_partitions_Q+1)
+    Return_PeriodQ= 1/(1- np.transpose([CDF_Q(Q, mu, alpha, beta, S_limit, GEV_parameters, PMP, partition_avg, Delta_P, error_PQ) for Q in Q_line]))
+    df_runoff = pd.DataFrame(Q_line, index = Return_PeriodQ, columns= [ 'Runoff'] )
+    df_GEV_parameters_R = GEV_parameters_Fit(df_runoff, 'Runoff', PMP)
+    return df_runoff, df_GEV_parameters_R
+
+def runoff_weights(Return_Intervals: np.ndarray, RI_upper_bound: float, mu: float, GEV_Parameters_Runoff, \
+                   GEV_Parameters_Rain, PMP: float, partition_avg: np.ndarray, Delta_P: float, error_PQ:float):
+    '''Calculate the weights of the runoff events assuming that a GEV distribution is the best fit to the 
+    runoff distribution that was derived analytically (and implemented with numerical integration) based on the
+    GEV PDF of rainfall and the distribution of the max. potential retention from PRFA.
+    '''
     Size = Return_Intervals.size
     Bin_Bounds = np.zeros(Size+1)
     Bin_Bounds[Size] = RI_upper_bound
     for i in range(0, Size):
-        Bin_Bounds[Size-i-1] = Bound_L(Bin_Bounds[Size-i], Return_Intervals[Size-i-1],\
-                                       mu, GEV_parameters, PMP, partition_avg,\
-                                       Delta_P, np.array([1.01]), f_RI_Q ).x[0] 
-        print('Bin Ceiling = %s, Bin Floor %s' %(Bin_Bounds[Size-i],Bin_Bounds[Size-i-1] ) )
-    #Calculate the Average/typical precipitation for the upper bin bound and PMP
-    lower_bound = f_RI_Q(RI_upper_bound)
-    Avg_Q_Upper = Avg_Q(lower_bound, PMP, mu, GEV_parameters,\
-                        PMP, partition_avg, Delta_P)[0]/(1/RI_upper_bound)
-    Prob_Q_Upper = 1- (CDF_Q( Avg_Q_Upper, mu, alpha, \
-                                        beta, S_limit, GEV_parameters, \
-                                        PMP, partition_avg, Delta_P)/(1-error_PQ))
-    Return_Intervals_Q = np.append(Return_Intervals,1/Prob_Q_Upper)
-    Runoff_Q = f_RI_Q(Return_Intervals_Q)
-    df_runoff = pd.DataFrame(data=Runoff_Q ,index=Return_Intervals_Q.astype(int), columns=['Runoff'])
+        Bin_Bounds[Size-i-1] = \
+        bound_lower_GEV(Bin_Bounds[Size-i], \
+                        Return_Intervals[Size-i-1], \
+                        GEV_Parameters_Runoff, \
+                        np.array([ Return_Intervals[Size-i-1]*.2 ]), \
+                        PMP).x[0] 
+        print('Bin Ceiling = %s, Bin Average = %s, Bin Floor = %s' \
+                %(Bin_Bounds[Size-i], Return_Intervals[Size-i-1], Bin_Bounds[Size-i-1]))
+    #Calculate the Average/typical precipitation between the RI upper bound and PMP
+    lower_bound = PPF_GEV( 1-1/ RI_upper_bound, GEV_Parameters_Runoff, PMP)
+    Avg_Plus  = Avg_Q(lower_bound, PMP, mu, GEV_Parameters_Rain,\
+                        PMP, partition_avg, Delta_P, error_PQ)[0]/(1/RI_upper_bound)
+    Prob_Plus =  CDF_GEV(Avg_Plus, GEV_Parameters_Runoff, PMP)
+    #New RI index with additional event
+    RI_index = np.append(Return_Intervals, 1/(1-Prob_Plus)).astype(int)
+    
+    Event_Amount = PPF_GEV(1-1/RI_index, GEV_Parameters_Runoff, PMP)
+    df_runoff = pd.DataFrame(data = Event_Amount ,index = RI_index.astype(int), columns=['Runoff'])
     #weights of events   
     weights = (1.0/Bin_Bounds[:-1]-1.0/Bin_Bounds[1:]).astype(float)
     weights = np.append(weights, 1/RI_upper_bound)
     data= np.vstack(( Bin_Bounds, \
                  np.append(Bin_Bounds[1:], np.inf),\
                  weights)).T
-    df_weights =  pd.DataFrame(data=data, index=Return_Intervals_Q.astype(int), \
+    df_weights =  pd.DataFrame(data=data, index=RI_index.astype(int), \
                            columns=['Bin Floor', 'Bin Celing','Event Weight']) 
-    return f_RI_Q, f_Q_RI, pd.concat([ df_weights, df_runoff], axis=1)
+    return pd.concat([ df_weights, df_runoff], axis=1)
 
-
-def Scenarios_Avg_S_Median_S(df_weights_runoff: pd.DataFrame, mu: float, GEV_parameters, PMP: float, partition_avg: np.ndarray, Delta_P: float, alpha: float, beta: float, S_limit: float)->pd.DataFrame:
+def Scenarios_Avg_S_Median_S(df_weights_runoff: pd.DataFrame, mu: float, GEV_parameters, PMP: float, partition_avg: np.ndarray, Delta_P: float, alpha: float, beta: float, S_limit: float, error_PQ:float)->pd.DataFrame:
     '''Calculate median and average max. potential retention scenarios for given runoff.
     '''
     Runoff_Q = df_weights_runoff['Runoff'].to_numpy()
     Return_Intervals_Q = df_weights_runoff.index.to_numpy().astype(int)
-    Avg_S_list = [Avg_SlQ(Q1, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha, beta, S_limit,0,S_limit)[0] for Q1 in Runoff_Q]
+    Avg_S_list = [Avg_SlQ(Q1, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha, beta, S_limit, error_PQ, 0,S_limit)[0] for Q1 in Runoff_Q]
     R_Avg_S = [1/2*(Q+np.sqrt(Q)*np.sqrt(Q+4*S)+2*S*mu) for Q, S in zip(Runoff_Q, Avg_S_list) ]
     #Bounds and initial value for finding the Median max. potential retention
     bounds= [(.25, S_limit)]
     Initial_Value = np.array([1.5])
     #Find the median value of the max. potential retention
-    Median_S_list = [Median_S(Q1, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha, beta, S_limit, bounds, Initial_Value).x[0] for Q1 in Runoff_Q]
+    Median_S_list = [Median_S(Q1, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha, beta, S_limit, error_PQ, bounds, Initial_Value).x[0] for Q1 in Runoff_Q]
     R_Median_S = [1/2*(Q+np.sqrt(Q)*np.sqrt(Q+4*S)+2*S*mu) for Q, S in zip(Runoff_Q, Median_S_list) ]
     #Save results as a dataframe
     new_data = np.vstack(( Avg_S_list, R_Avg_S, Median_S_list, R_Median_S)).T
     df_SR1 = pd.DataFrame(data=new_data, index=Return_Intervals_Q.astype(int), columns=['Avg. S', 'Rainfall','Median S', 'Rainfall']) 
     return  pd.concat([df_weights_runoff, df_SR1], axis=1)
 
-def Scenarios_low_and_high_S(df_runoff_SR1: pd.DataFrame, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, alpha: float, beta: float, S_limit: float)->pd.DataFrame:
+def Scenarios_low_and_high_S(df_runoff_SR1: pd.DataFrame, mu: float, GEV_parameters: np.ndarray, PMP: float, partition_avg: np.ndarray, Delta_P: float, alpha: float, beta: float, S_limit: float, error_PQ:float)->pd.DataFrame:
     '''Calculate scenarios for high and low maximum potential retention'''
     weights_runoff = df_runoff_SR1['Event Weight'].to_numpy()
     Runoff_Q = df_runoff_SR1['Runoff'].to_numpy()
     Return_Intervals_Q = df_runoff_SR1.index.to_numpy().astype(int)
     Median_S_list = df_runoff_SR1['Median S'].to_numpy()
-    Avg_S_Lower50_list = [Avg_SlQ(Q1, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha,beta,S_limit,0,S1)[0]/0.5 for Q1, S1 in zip(Runoff_Q, Median_S_list)]
-    Avg_S_Upper50_list = [Avg_SlQ(Q1, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha,beta,S_limit,S1,S_limit)[0]/0.5 for Q1, S1 in zip(Runoff_Q, Median_S_list)]
+    Avg_S_Lower50_list = [Avg_SlQ(Q1, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha,beta, S_limit,error_PQ, 0,S1)[0]/0.5 for Q1, S1 in zip(Runoff_Q, Median_S_list)]
+    Avg_S_Upper50_list = [Avg_SlQ(Q1, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha,beta, S_limit, error_PQ, S1,S_limit)[0]/0.5 for Q1, S1 in zip(Runoff_Q, Median_S_list)]
     R_Avg_S_Lower50 = [1/2*(Q+np.sqrt(Q)*np.sqrt(Q+4*S)+2*S*mu) for Q, S in zip(Runoff_Q, Avg_S_Lower50_list) ]
     R_Avg_S_Upper50 = [1/2*(Q+np.sqrt(Q)*np.sqrt(Q+4*S)+2*S*mu) for Q, S in zip(Runoff_Q, Avg_S_Upper50_list) ]
     new_data = np.vstack(( weights_runoff*.5,    Runoff_Q ,  Avg_S_Lower50_list, R_Avg_S_Lower50, \
@@ -487,24 +489,24 @@ def mean_curve_input_table(CL: np.ndarray, return_interval_data: pd.DataFrame,  
 ################################
 
 
-def plot_GEV_precip_curves(precip_data, df_GEV_parameters, PMP)-> plt.subplots:
+def plot_GEV_precip_curves(precip_data, df_GEV_parameters, PMP:float, Label1:str='', Label2:str='')-> plt.subplots:
     '''This functions plots the GEV distributions and also associated GEV return frequency curves 
     on top of the precpitation curve data taken either from NOAA Atlas 14 or from the 
     mean precipitation curve output.
     '''
     fig, ((fig1a, fig1b)) = plt.subplots(nrows=1, ncols=2,figsize=(10,4))
-    fig1a.set_xlabel('Rainfall, inches'),fig1a.set_ylabel('GEV PDF $p_R(R)$'), fig1a.set_title('24-hour Rainfall')
+    fig1a.set_xlabel(Label1 +' '+ Label2 +', inches'),fig1a.set_ylabel('GEV PDF'), fig1a.set_title('24-hour '+ Label1 +' '+ Label2)
     fig1b.set_xscale('log')
-    fig1b.set_xlabel('Return Period (years)'),fig1b.set_ylabel('Rainfall, inches'), fig1b.set_title('24-hour Rainfall')
+    fig1b.set_xlabel('Return Period (years)'),fig1b.set_ylabel(Label1 +' '+ Label2 +', inches'), fig1b.set_title('24-hour '+ Label1 +' '+ Label2)
     color = ['r','k','k','k']
 
     # Yields a tuple of column name and series for each column in the dataframe
     GEV_parameters = np.zeros(shape = (df_GEV_parameters.shape[1], df_GEV_parameters.shape[0]))
-    Return_Period =  np.zeros(shape = (df_GEV_parameters.shape[1], 100))
-    Precip        =  np.zeros(shape = (df_GEV_parameters.shape[1], 100))
+    Return_Period =  np.zeros(shape = (df_GEV_parameters.shape[1], 1000))
+    Precip        =  np.zeros(shape = (df_GEV_parameters.shape[1], 1000))
     for (i, (columnName, columnData)) in enumerate(df_GEV_parameters.iteritems()):
         GEV_parameters[i] = df_GEV_parameters[columnName].to_numpy().transpose()
-        Precip[i] = np.linspace(PPF_GEV(10**-100, GEV_parameters[i], PMP), PPF_GEV(.999999, GEV_parameters[i], PMP), 100)
+        Precip[i] = np.linspace(PPF_GEV(10**-100, GEV_parameters[i], PMP), PPF_GEV(.9999999, GEV_parameters[i], PMP), 1000)
         Return_Period[i] = 1/(1-CDF_GEV(Precip[i],  GEV_parameters[i] , PMP))
         fig1a.plot(Precip[i], PDF_GEV(Precip[i], GEV_parameters[i], PMP) ,
         color[i] , lw=2, alpha=0.6, label='genextreme pdf')
@@ -548,15 +550,20 @@ def plot_runoff_maxRetention_distributions(GEV_parameters_E: np.ndarray, PMP:flo
     plt.show()
     
 
-def plot_runoff_distributions_final(GEV_parameters_E: np.ndarray, PMP:float, fitted_cn: pd.DataFrame, partition_avg: np.ndarray, Delta_P: float, f_RI_Q)-> plt.subplots:
+def plot_runoff_distributions_final(GEV_parameters_Rain: np.ndarray, \
+                                    GEV_parameters_Runoff: np.ndarray, PMP:float, fitted_cn: pd.DataFrame,\
+                                    partition_avg: np.ndarray, Delta_P: float, error_PQ:float)-> plt.subplots:
     '''Plots the runoff distribution and the runoff return frequency curve
     in comparison to the original rainfall return frequency curve.
     '''
     mu = fitted_cn.iloc[0]['mu']
+    
     Q1= np.linspace(.01, 6, 1000)
-    Return_PeriodQ = np.linspace(1, 10**5.4, 100000)
-    Precip = np.linspace(PPF_GEV(10**-100, GEV_parameters_E, PMP), PPF_GEV(.999999, GEV_parameters_E, PMP), 100)
-    Return_Period = 1/(1-CDF_GEV(Precip,  GEV_parameters_E , PMP))
+    
+    Return_Period = np.geomspace(1.1, 10**7, 100000)
+    
+    Precip = PPF_GEV(1-1/Return_Period, GEV_parameters_Rain, PMP)
+    Runoff = PPF_GEV(1-1/Return_Period, GEV_parameters_Runoff, PMP)
  
     fig, ((fig3a, fig3b)) = plt.subplots(nrows=1, ncols=2,figsize=(10,4))
     
@@ -565,20 +572,20 @@ def plot_runoff_distributions_final(GEV_parameters_E: np.ndarray, PMP:float, fit
     fig3a.set_prop_cycle(custom_cycler)
     fig3a.grid(linestyle='--')
     fig3a.set_xlabel('Runoff, Q (inches)'),fig3a.set_ylabel('$p_Q(Q)$'), fig3a.set_title('Runoff Distribution')
-    fig3a.plot(Q1,PDF_Q(Q1, mu, GEV_parameters_E, PMP, partition_avg, Delta_P))
+    fig3a.plot(Q1,PDF_Q(Q1, mu, GEV_parameters_Rain, PMP, partition_avg, Delta_P, error_PQ))
   
     fig3b.set_xscale('log')
     fig3b.set_prop_cycle(custom_cycler)
     fig3b.grid(linestyle='--')
     fig3b.set_ylim((0, PMP))
     fig3b.set_xlabel('Runoff, Q (inches)'), fig3b.set_ylabel('Rainfall (red) and Runoff (gray), inches$'), fig3b.set_title('24-hour Event')
-    fig3b.plot(Return_PeriodQ, f_RI_Q(Return_PeriodQ), 'b', lw =2.9, alpha=.45)
+    fig3b.plot(Return_Period, Runoff, 'b', lw =2.9, alpha=.45)
     fig3b.plot(Return_Period, Precip, 'r-', lw=5, alpha=0.6, label='genextreme pdf')
     
     plt.tight_layout()
     plt.show()
     
-def plot_max_potential_retention_cond_runoff(GEV_parameters_E: np.ndarray, PMP:float, fitted_cn: pd.DataFrame,  partition_avg: np.ndarray, Delta_P: float):
+def plot_max_potential_retention_cond_runoff(GEV_parameters_E: np.ndarray, PMP:float, fitted_cn: pd.DataFrame,  partition_avg: np.ndarray, Delta_P: float, error_PQ:float):
     '''Plots the distribution of the max. potential retention conditional on different runoff values.
     '''
     S_limit = 1000/fitted_cn.iloc[0]['CN Lower Limit']-10
@@ -593,10 +600,11 @@ def plot_max_potential_retention_cond_runoff(GEV_parameters_E: np.ndarray, PMP:f
     custom_cycler = cycler('color', ['.1', '.25', '.4', '.55']) + cycler('lw', [1, 1, 1, 1])
 
     fig4.set_prop_cycle(custom_cycler)
-    QA=np.linspace(.5, 10 , 50)
-    fig4.plot(S1, np.transpose([PDF_SlQ(S1, Q1, mu, GEV_parameters_E, PMP, partition_avg, Delta_P, alpha, beta, S_limit) for Q1 in QA]))
+    QA=np.linspace(.5, PMP , 50)
+    PDF_S = np.transpose([PDF_SlQ(S1, Q1, mu, GEV_parameters_E, PMP, partition_avg, Delta_P, alpha, beta, S_limit, error_PQ) for Q1 in QA])
+    fig4.plot(S1, PDF_S)
     fig4.grid(linestyle='--')
-    fig4.set_ylim((0, .45))
+    fig4.set_ylim(0, np.amax(PDF_S))
     fig4.set_xlabel('Max. Potential Retention, S (inches)'),fig4.set_ylabel('$p_S(S | Q)$'), fig4.set_title('Conditional Max. Potential Retention Distribution')
 
     plt.tight_layout()
