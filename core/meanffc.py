@@ -38,10 +38,10 @@ def make_directories(dir_lst: list, verbose: bool = True) -> None:
         if not os.path.isdir(directory):
             os.makedirs(directory)
             if verbose:
-                print('{0} - created'.format(str(directory)))
+                print('{0} - created\n'.format(str(directory)))
         else:
             if verbose:
-                print('{0} - already exists'.format(str(directory)))
+                print('{0} - already exists\n'.format(str(directory)))
     return None
 
 
@@ -81,6 +81,8 @@ def list_ssp_files(path: plib, max_cl: float = 0.999,
                 print('{0} not added to list, check naming '
                       'convention'.format(filename))
     assert len(ssp_results) > 0, 'No .rpt files identified in {0}'.format(path)
+    if verbose:
+        print('')
     return ssp_results
 
 
@@ -152,7 +154,7 @@ def GetFreqCurves(f: plib, version: str = '2_2') -> pd.DataFrame:
     return df
 
 
-def monotonic_test(df: pd.DataFrame, adj_amount: float = 1.0) -> pd.DataFrame:
+def monotonic_test(df: pd.DataFrame, adj_amount: float = 1.0, verbose: bool = True) -> pd.DataFrame:
     """Test that the discharge increases with decreasing annual exceedance
        probability and adjust the discharge for the smallest annual exceedance
        probabilities if not.
@@ -171,12 +173,12 @@ def monotonic_test(df: pd.DataFrame, adj_amount: float = 1.0) -> pd.DataFrame:
                 df.loc[v][col] = val[num - 1 - i]
             cl = float(col) * 100.0
             aep = df.iloc[0].name
-            warnings.warn('Q not increasing with decreasing AEP for the {0}% '
-                          'CL: difference of {1} cfs between {2} and {3}. '
-                          'Adjusting Q'.format(cl, diff, aep, idx))
-    if no_adjust:
-        print('Discharge increases with decreasing annual exceedance '
-              'probability for all confidence limits')
+            warnings.warn('Values not increasing with decreasing AEP for the {0}% '
+                          'CL: difference of {1} between {2} and {3}. '
+                          'Adjusting values\n'.format(cl, diff, aep, idx))
+    if no_adjust and verbose:
+        print('Values increase with decreasing annual exceedance '
+              'probability for all confidence limits as expected\n')
     return df
 
 
@@ -188,7 +190,7 @@ def zvar(cl: list) -> np.ndarray:
     return clz
 
 
-def binQ(df: pd.DataFrame) -> np.ndarray:
+def binq(df: pd.DataFrame) -> np.ndarray:
     """Determines the minimum and maximum discharge value for the passed
        dataframe and constructs an array of equally spaced discharge between
        these two values.
@@ -199,7 +201,7 @@ def binQ(df: pd.DataFrame) -> np.ndarray:
     return q
 
 
-def interp_AEP(df: pd.DataFrame, q: np.ndarray, clz: np.ndarray,
+def interp_aep(df: pd.DataFrame, q: np.ndarray, clz: np.ndarray,
                aepz: np.ndarray, extrapolate: bool = True) -> pd.DataFrame:
     """Apply linear interpolation/extrapolation to calculate AEP(z) for
        each CL(z) and binned flow.
@@ -240,7 +242,7 @@ def zvar_inv(df: pd.DataFrame, cl: list) -> pd.DataFrame:
     return df
 
 
-def mean_AEP(df: pd.DataFrame, exclude_tails: bool = True) -> list:
+def mean_aep(df: pd.DataFrame, exclude_tails: bool = True) -> list:
     """Calculate the mean (expected) value of the annual exceedance
        probability for each flow; the mean is equal to the area under the
        CDF, which is calculated using the trapezoidal rule. If exclude_tails
@@ -458,7 +460,7 @@ def plot_ssp_meanmed(aepz: np.ndarray, df: pd.DataFrame, aepmz: np.ndarray,
     return None
 
 
-def plot_ssp_meanmedffc(table: pd.DataFrame, gage_id: str) -> None:
+def plot_ssp_meanmedffc(table: pd.DataFrame, gage_id: str, data_type: str = 'Q') -> None:
     """Plot the mean and median flow frequency curves using both the annual
        exceedance probability and the recurrence interval on a log-log plot.
     """
@@ -467,7 +469,7 @@ def plot_ssp_meanmedffc(table: pd.DataFrame, gage_id: str) -> None:
     xlabels = ['Annual Exceedance Probability', 'Recurrence Interval']
     xunits = ['%', 'years']
     position = ['left', 'right']
-    fig, ax = plt.subplots(1, 2, figsize=(24, 6))
+    _, ax = plt.subplots(1, 2, figsize=(24, 6))
     for i, idx in enumerate([perc_aep, ri]):
         ax[i].plot(idx, table['Q_Median_cfs'], linestyle='-',
                    marker='.', label='Median', color='black')
@@ -476,9 +478,17 @@ def plot_ssp_meanmedffc(table: pd.DataFrame, gage_id: str) -> None:
         ax[i].set_xscale('log')
         ax[i].set_yscale('log')
         ax[i].set_xlabel('{0}, [{1}]'.format(xlabels[i], xunits[i]))
-        ax[i].set_ylabel('Discharge, [cfs]')
-        ax[i].set_title('Discharge vs. {0} (Station ID: {1})'
-                        ''.format(xlabels[i], gage_id))
+        if data_type == 'Q':
+            ax[i].set_ylabel('Discharge, [cfs]')
+            ax[i].set_title('Discharge vs. {0} (Station ID: {1})'
+                            ''.format(xlabels[i], gage_id))
+        elif data_type == 'P':
+            ax[i].set_ylabel('Precipitation, [in]')
+            ax[i].set_title('Precipitation vs. {0} (Station ID: {1})'
+                            ''.format(xlabels[i], gage_id))
+        else:
+            raise ValueError('The specified data_type may only be "Q" or "P" corresponding to discharge or '
+                              'precipitation, respectively')
         ax[i].grid(True, which='both')
         ax[i].legend(loc='lower {0}'.format(position[i]), frameon=True)
         if i == 0:
