@@ -44,6 +44,8 @@ __NOTE__: [EventsTable](EventsTable.ipynb) is the primary notebook for developin
 
 - [__EventsTable__](EventsTable.ipynb): Calculates excess rainfall using area-averaged NOAA Atlas 14 precipitation data, temporal distributions, the curve number (CN)* transform, and a convolution reduction algorithm (grouping). The output is a set of unique, weighted excess rainfall time series.
 
+- [__EventsTable_Stratified__](EventsTable_Stratified.ipynb): Calculates a stratified sample of runoff events given rainfall and maximum potential retention distributions. For each each event and corresponding return interval, the event weight, runoff value, maximum potential retention value, and rainfall value are calculated.
+
 - [__reEventsTable__](reEventsTable.ipynb): Calculates the reduced excess rainfall given a user-specified stormwater removal rate and capacity. Given user-specified contributing areas (stormsheds), the lateral inflow hydrograhs are also calculated for each event.
 
 - [__distalEventsTable__](distalEventsTable.ipynb): Calculates excess rainfall using updated randomized curve numbers and the original precipitation events calculated in `EventsTable.ipynb`. The events are combined using the groups determined during the convolution steps in `EventsTable.ipynb`. The `reEventsTable` notebook can be then be executed in order to calculate the reduced excess rainfall.
