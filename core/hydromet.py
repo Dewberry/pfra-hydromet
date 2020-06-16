@@ -10,8 +10,8 @@ import logging
 import operator
 import warnings
 import pathlib as pl
-import papermill as pm
-import scrapbook as sb
+#import papermill as pm
+#import scrapbook as sb
 from zipfile import ZipFile
 from datetime import datetime
 logging.basicConfig(level=logging.ERROR)
@@ -136,7 +136,7 @@ def build_precip_table(geo_df: geoDF, all_zips_list: list, noaa_url: str,
         with ZipFile(memfile, 'r') as openzip:
             gridfiles = openzip.namelist()
             mes = "Expected to find 1 file, found {0}".format(len(gridfiles))
-            assert len(gridfiles) == 1, mes
+            assert len(gridfiles) == 3, mes
             local_file = gridfiles[0]
             f = openzip.open(local_file)
             content = f.read() 
