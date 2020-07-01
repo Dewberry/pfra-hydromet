@@ -293,7 +293,7 @@ def weights_Rainfall(Return_Intervals: np.ndarray, GEV_parameters: np.ndarray, P
     df2 = pd.DataFrame(data = Precip_calculate, index = RI_index_calc, columns=[ID])  
     df_R_NOAA_E = NOAA_precip[NOAA_precip.index.isin(RI_data)].copy()
     df_precip = df_R_NOAA_E.append(df2)
-    df_precip = df_precip.drop('P_Median_in', axis=1)
+    df_precip = pd.DataFrame(df_precip.iloc[:,0])#df_precip.drop('P_Median_in', axis=1)
     Q = Q_SCS(df_precip[ID].values, CN, mu)
     df_precip['Runoff'] = Q 
     return pd.concat([df_weights, df_precip], axis=1)
