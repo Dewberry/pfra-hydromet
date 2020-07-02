@@ -351,7 +351,7 @@ def Scenarios_Avg_S_Median_S(df_weights_runoff: pd.DataFrame, mu: float, GEV_par
                           S_limit) for Q1 in Runoff_Q]
     R_Avg_S = [1.0/2.0*(Q+np.sqrt(Q)*np.sqrt(Q+4.0*S)+2.0*S*mu) for Q, S in zip(Runoff_Q, Avg_S_list)]
     Median_S_list = [Median_S(Q1, mu, GEV_parameters, PMP, partition_avg, Delta_P, alpha, beta, S_limit, error_PQ, 
-                              [(0.25, S_limit)], 1.5).x[0] for Q1 in Runoff_Q]
+                              [(0.25, S_limit)], (0+S_limit)/3).x[0] for Q1 in Runoff_Q]
     R_Median_S = [1.0/2.0*(Q+np.sqrt(Q)*np.sqrt(Q+4.0*S)+2.0*S*mu) for Q, S in zip(Runoff_Q, Median_S_list)]
     new_data = np.vstack((Avg_S_list, R_Avg_S, Median_S_list, R_Median_S)).T
     df_SR1 = pd.DataFrame(data=new_data, index=Return_Intervals_Q, 
@@ -485,6 +485,65 @@ def precip_hyetograph_nrcs(df : pd.DataFrame) -> pd.DataFrame:
     ratio_to_24h.index = ratio_to_24h.index*0.1
     return ratio_to_24h
 
+def get_hyeto_input_data(temporal_precip_table_dir: str, event_or_quartile,
+                                 display_print: bool=True) -> pd.DataFrame:
+    '''Extracts the temporal distribution for precipitation frequency data for the specified duration
+       from an Excel sheet and returns the dataframe with the data.  
+    '''
+    if type(event_or_quartile) == int:
+        hyeto_precip = 'nrcs_hye_{}'.format(event_or_quartile)
+        df = pd.read_excel(temporal_precip_table_dir, sheet_name= hyeto_precip, index_col=0)
+        if display_print: print(display(df.head(2)))
+        return df
+    if type(event_or_quartile) == str:
+        hyeto_precip = 'atlas_hye_{}'.format(event_or_quartile)
+        df = pd.read_excel(temporal_precip_table_dir, sheet_name= hyeto_precip, index_col=0)
+        weights_df = pd.read_excel(temporal_precip_table_dir, sheet_name= 'atlas_hye_weights', index_col=0)
+        if display_print: print(display(df.head(2)))
+        return df, weights_df
+
+def hydro_out_to_dic(curve_df: pd.DataFrame, BCN: str) -> dict:
+    '''This function takes the dataframe and adding additional data
+    required for the dss file and json file creation.
+    '''
+    dic = {}
+    df_dic = curve_df.to_dict()
+    dates = list(curve_df.index)
+    ordin = curve_df.index.name.title()
+    events = {}
+    for k, v in df_dic.items():
+        if 'E' in k:
+            events[k] = list(v.values())
+    key ='H{0}'.format(str(24).zfill(2))
+    val = {'time_idx_ordinate': ordin, 
+            'run_duration_days': str(2),
+            'time_idx': dates, 
+            'pluvial_BC_units': 'inch/ts', 
+            'BCName': {BCN: events}}         
+    dic[key] = val
+    return dic
+
+
+def Rename_Final_Groups_Precip_Stratified(curve_weight: dict, dur: int) -> dict:
+    '''Sorts the groups by their weight and then renames the groups so that
+       the group with the largest weight is designed E0001 and the group with
+       the next largest weight is designated E0002 (for the 6 hour duration). 
+       The thounsands place is set to 0, 1, 2, 3 for the 6, 12, 24, and 96 
+       hour durations, respectively. A dictionary mapping the original group
+       names to the new group names is returned. 
+    '''
+    assert dur in [6, 12, 24, 96], "Naming convention not set for duration"
+    rename_map = {}
+    weights = curve_weight.values()
+    dur_adj = {6:0, 12:1, 24:2, 96:3 }
+    num = 1
+    #for i in weights:
+    for k, v in curve_weight.items():
+       #if i==v:
+        ID = 'E{0}{1}'.format(dur_adj[dur],str(num).zfill(3))
+        rename_map[k] = ID 
+        num+=1
+    return rename_map   
 
 #----------------------------------------------------------------------------------------------------------------------#
 # Functions for calculating inputs to the mean precipitation curve calculation.
