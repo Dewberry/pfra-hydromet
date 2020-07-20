@@ -10,8 +10,8 @@ import logging
 import operator
 import warnings
 import pathlib as pl
-#import papermill as pm
-#import scrapbook as sb
+import papermill as pm
+import scrapbook as sb
 from zipfile import ZipFile
 from datetime import datetime
 logging.basicConfig(level=logging.ERROR)
@@ -37,6 +37,9 @@ from shapely.geometry import mapping
 
 geoDF = 'GeoDataFrame'
 plib = 'pathlib.Path'
+
+AEC_METERS = ("+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 "
+              "+x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")
 
 
 #---------------------------------------------------------------------------#
@@ -65,7 +68,8 @@ def check_attributes(gdf: geoDF) -> None:
 
 
 def intersect_temporal_areas(geo_df: geoDF, datarepository_dir: plib, 
-           Temporal_area_filename: str, alldata: bool=False) -> (dict, geoDF):
+           Temporal_area_filename: str, alldata: bool=False, 
+           projected_crs: str = AEC_METERS) -> (dict, geoDF):
     '''Intersects the area of interest with the NOAA Atlas 14 volumes and 
        regions. The volume, region, and percent area of the area of interest 
        is returned in a dictionary. If alldata is set to True, the dictionary
@@ -75,11 +79,12 @@ def intersect_temporal_areas(geo_df: geoDF, datarepository_dir: plib,
        region that has the largest intersection with the area of interest.
     '''
     vol_gdf = gpd.read_file(datarepository_dir/Temporal_area_filename)
-    vol_gdf = vol_gdf.to_crs(geo_df.crs)
-    intersection = gpd.overlay(geo_df, vol_gdf, how='intersection')
-    intersection['area'] = intersection.geometry.apply(lambda x: x.area)
+    vol_gdf.to_crs(AEC_METERS, inplace = True)
+    geo_df_projected = geo_df.to_crs(AEC_METERS)
+    intersection = gpd.overlay(geo_df_projected, vol_gdf, how='intersection')
+    intersection['area'] = intersection['geometry'].apply(lambda x: x.area)
     t_area = sum(intersection['area'])
-    intersection['p_area'] = intersection.area.apply(lambda x: x/t_area*100)
+    intersection['p_area'] = intersection['area'].apply(lambda x: x/t_area*100)
     intersection = intersection.sort_values('p_area', ascending=False)
     intersection = intersection.reset_index(drop=True)
     d = {}
@@ -94,6 +99,7 @@ def intersect_temporal_areas(geo_df: geoDF, datarepository_dir: plib,
             d[f'Percent_area_{i}'] = intersection.loc[i, 'p_area']
     for k,v in d.items():
         print('{:<17s}{:>1s}'.format(str(k),str(v)))
+    intersection.to_crs(geo_df.crs, inplace = True)    
     return OrderedDict(d), intersection
 
 
@@ -144,10 +150,17 @@ def build_precip_table(geo_df: geoDF, all_zips_list: list, noaa_url: str,
             with open(local_file_disk, 'wb') as asc:
                 asc.write(content)
         grid_data = parse_filename(zip_name, vol_code)
-        grid_data['value'] = get_masked_mean_atlas14(geo_df, local_file_disk)    
-        results.append(grid_data)
-        os.remove(local_file_disk)
-        if verbose: print(i, zip_name)
+        try:
+            grid_data['value'] = get_masked_mean_atlas14(geo_df, local_file_disk)   
+            results.append(grid_data)
+            os.remove(local_file_disk)
+            if verbose: 
+                print(i, zip_name)
+        except ValueError as e:
+            if 'Input shapes do not overlap' in str(e):
+                print(f'{e} - if two volumes were identified, try using the other volume')
+                os.remove(local_file_disk)
+                raise e
     df = pd.DataFrame.from_dict(results)
     assert df.isnull().values.any()!=True, 'NaN in results dataframe'
     if verbose: 
