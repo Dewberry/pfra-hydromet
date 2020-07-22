@@ -521,18 +521,55 @@ def hydro_out_to_dic(curve_df: pd.DataFrame, BCN: str) -> dict:
     return dic
 
 
-def Rename_Final_Groups_Precip_Stratified(curve_weight: dict, dur: int) -> dict:
+def Rename_Final_Groups_Precip_Stratified(curve_weight: dict, hydrology: int) -> dict:
     '''Creates a unique event name based on the duration and relative recurrence interval.
     '''
-    assert dur in [6, 12, 24, 96], "Naming convention not set for duration"
+    assert hydrology in [1, 2, 3, 4], "Naming convention not set for hydrology"
     rename_map = {}
-    dur_adj = {6:0, 12:1, 24:2, 96:3 }
     num = 1
     for k in curve_weight.keys():
-        ID = 'E{0}{1}'.format(dur_adj[dur], str(num).zfill(3))
+        ID = 'E{0}{1}'.format(hydrology, str(num).zfill(3))
         rename_map[k] = ID 
         num+=1
     return rename_map   
+
+def combine_results_stratified(var: str, outputs_dir: str, BCN: str, duration: int, hydrology_IDs: list,
+         run_dur_dic: dict=None, remove_ind_dur: bool = True) -> dict:
+    '''Combines the excess rainfall *.csv files for each duration into a 
+       single dictionary for all durations.
+    '''
+    assert var in ['Excess_Rainfall', 'Weights'], 'Cannot combine results'
+    dic = {}
+    df_lst = []
+    for ID in hydrology_IDs:
+        scen='{0}_Dur{1}_Hydro{2}'.format(BCN, duration, ID)
+        file = outputs_dir/'{}_{}.csv'.format(var, scen)
+        df = pd.read_csv(file, index_col = 0)
+        if var == 'Excess_Rainfall':
+            df_dic = df.to_dict()
+            dates = list(df.index)
+            ordin = df.index.name.title()
+            events = {}
+            for k, v in df_dic.items():
+                if 'E' in k:
+                    events[k] = list(v.values())
+            key ='H{0}'.format(str(ID).zfill(2))
+            val = {'time_idx_ordinate': ordin, 
+                   'run_duration_days': run_dur_dic[str(duration)],
+                    'time_idx': dates, 
+                    'pluvial_BC_units': 'inch/ts', 
+                    'BCName': {BCN: events}}         
+            dic[key] = val
+        elif var == 'Weights':
+            df_lst.append(df)
+        if remove_ind_dur:
+            os.remove(file)    
+    if var == 'Weights':
+        all_dfs = pd.concat(df_lst)
+        weights_dic = all_dfs.to_dict()
+        dic = {'BCName': {BCN: weights_dic['Weight']}}
+        print('Total Weight:', all_dfs['Weight'].sum())
+    return dic
 
 #----------------------------------------------------------------------------------------------------------------------#
 # Functions for calculating inputs to the mean precipitation curve calculation.
