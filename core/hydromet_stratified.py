@@ -1,4 +1,5 @@
 import pathlib as pl
+import os
 import numpy as np
 import pandas as pd
 from scipy.integrate import quad
@@ -536,13 +537,14 @@ def Rename_Final_Groups_Precip_Stratified(curve_weight: dict, hydrology: int) ->
 def combine_results_stratified(var: str, outputs_dir: str, BCN: str, duration: int, hydrology_IDs: list,
          run_dur_dic: dict=None, remove_ind_dur: bool = True) -> dict:
     '''Combines the excess rainfall *.csv files for each duration into a 
-       single dictionary for all durations.
+       single dictionary for all durations. A small value of 0.0001 is added so the result is not printed in scientific notation.
     '''
+    pd.reset_option('^display.', silent=True)
     assert var in ['Excess_Rainfall', 'Weights'], 'Cannot combine results'
     dic = {}
     df_lst = []
     for ID in hydrology_IDs:
-        scen='{0}_Dur{1}_Hydro{2}'.format(BCN, duration, ID)
+        scen = '{0}_Dur{1}_Hydro{2}'.format(BCN, duration, ID)
         file = outputs_dir/'{}_{}.csv'.format(var, scen)
         df = pd.read_csv(file, index_col = 0)
         if var == 'Excess_Rainfall':
@@ -552,7 +554,9 @@ def combine_results_stratified(var: str, outputs_dir: str, BCN: str, duration: i
             events = {}
             for k, v in df_dic.items():
                 if 'E' in k:
-                    events[k] = list(v.values())
+                    m = list(v.values())
+                    m1= [ float(i)+0.0001 if float(i)< 0.0001  and 0< float(i) else float(i)  for i in m]
+                    events[k] = m1
             key ='H{0}'.format(str(ID).zfill(2))
             val = {'time_idx_ordinate': ordin, 
                    'run_duration_days': run_dur_dic[str(duration)],
@@ -568,7 +572,7 @@ def combine_results_stratified(var: str, outputs_dir: str, BCN: str, duration: i
         all_dfs = pd.concat(df_lst)
         weights_dic = all_dfs.to_dict()
         dic = {'BCName': {BCN: weights_dic['Weight']}}
-        print('Total Weight:', all_dfs['Weight'].sum())
+        #print('Total Weight:', all_dfs['Weight'].sum())
     return dic
 
 #----------------------------------------------------------------------------------------------------------------------#
