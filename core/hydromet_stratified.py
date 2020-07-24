@@ -389,7 +389,8 @@ def precip_hyetograph_nrcs(df: pd.DataFrame) -> pd.DataFrame:
        hyetograph for storm events classified by recurrence intervals. The function first retrieves the ratio of 
        rainfall and incremental intensity; then proceeds to get the ratio, slope, and slope difference; and finally fits 
        a parabolic curve from 0 to 9 hours that passes through the ratios at 0, 6, and 9 hours. The function then fits 
-       curves for the remaining data until 12 hours.
+       curves for the remaining data until 12 hours. NOTE: this function is limited to 24 hours and needs to be updated
+       to be flexible for dfferent storm durations.
     """
     ratio_to_24h = pd.DataFrame(np.arange(start=0, stop=241, step=1), columns = ['time']).set_index(['time'])
     dif = df.diff()
