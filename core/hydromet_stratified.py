@@ -482,26 +482,29 @@ def precip_hyetograph_nrcs(df: pd.DataFrame) -> pd.DataFrame:
     return ratio_to_24h
 
 
-def get_hyeto_input_data(temporal_precip_table_dir: str, event_or_quartile: any, 
+def get_hyeto_input_data_nrcs(temporal_precip_table_dir: str, event: any,
                          display_print: bool=True) -> pd.DataFrame:
     '''Extracts the temporal distribution from precipitation frequency data for the specified duration from an Excel 
        sheet and returns the data as a dataframe. 
     '''
-    if type(event_or_quartile) == int:
-        hyeto_precip = 'nrcs_hye_{}'.format(event_or_quartile)
-        df = pd.read_excel(temporal_precip_table_dir, sheet_name=hyeto_precip, index_col=0)
-        if display_print: 
-            print(display(df.head(2)))
-        return df
-    if type(event_or_quartile) == str:
-        hyeto_precip = 'atlas_hye_{}'.format(event_or_quartile)
-        df = pd.read_excel(temporal_precip_table_dir, sheet_name=hyeto_precip, index_col=0)
-        weights_df = pd.read_excel(temporal_precip_table_dir, sheet_name='atlas_hye_weights', index_col=0)
-        if display_print: 
-            print(display(df.head(2)))
-        return df, weights_df
+    hyeto_precip = 'nrcs_hye_{}'.format(event)
+    df = pd.read_excel(temporal_precip_table_dir, sheet_name=hyeto_precip, index_col=0)
+    if display_print: 
+        print(display(df.head(2)))
+    return df
 
-
+def get_hyeto_input_data_atlas(temporal_precip_table_dir: str, quartile: any,
+                         display_print: bool=True) -> pd.DataFrame:
+    '''Extracts the temporal distribution from precipitation frequency data for the specified duration from an Excel 
+       sheet and returns the data as a dataframe. 
+    '''
+    hyeto_precip = 'atlas_hye_{}'.format(quartile)
+    df = pd.read_excel(temporal_precip_table_dir, sheet_name=hyeto_precip, index_col=0)
+    weights_df = pd.read_excel(temporal_precip_table_dir, sheet_name='atlas_hye_weights', index_col=0)
+    if display_print: 
+        print(display(df.head(2)))
+    return df, weights_df
+    
 def hydro_out_to_dic(curve_df: pd.DataFrame, BCN: str) -> dict:
     '''This function takes the dataframe and adds additional data required for the dss file and json file creation.
     '''
@@ -523,7 +526,7 @@ def hydro_out_to_dic(curve_df: pd.DataFrame, BCN: str) -> dict:
     return dic
 
 
-def Rename_Final_Groups_Precip_Stratified(curve_weight: dict, hydrology: int) -> dict:
+def Rename_Final_Events_Precip_Stratified(curve_weight: dict, hydrology: int) -> dict:
     '''Creates a unique event name based on the duration and relative recurrence interval.
     '''
     assert hydrology in [1, 2, 3, 4], "Naming convention not set for hydrology"
@@ -746,3 +749,118 @@ def plot_max_potential_retention_cond_runoff(GEV_parameters_E: np.ndarray, PMP: 
     ax.set_title('Conditional Max Potential Retention Distribution')
     plt.tight_layout()
     return None
+
+def precip_to_runoff_h1(hydro_events:np.ndarray,nrcs_precip_table_dir: pl.WindowsPath,
+                     precip_data: pd.DataFrame, df_weights_rainfall: pd.DataFrame, CN: int, display_print = False) -> pd.DataFrame:
+    """Takes the events, precipitation data, nrcs temporal distribution, CN and applies the CN reduction method to
+    obtain a runoff curve for each recurrence interval
+    """
+    runoff_distros1 = {}
+    prep_curves = pd.DataFrame(columns = hydro_events.astype(float))
+    for evnt in hydro_events:
+        dist_df = get_hyeto_input_data_nrcs(nrcs_precip_table_dir, evnt, display_print)
+        dist_df['precip'] = dist_df['ratio']*precip_data['Median'].loc[evnt]
+        s = S_24hr(CN)
+        ia = IA_24hr(s)
+        runoff_distros1[evnt] = excess_precip(dist_df,ia, s)
+        prep_curves[evnt] = dist_df['hyeto_input']
+    return prep_curves
+
+
+
+def precip_to_runoff_h2(hydro_events:np.ndarray ,nrcs_precip_table_dir: pl.WindowsPath,
+                     precip_data: pd.DataFrame,df_weights_rainfall: pd.DataFrame, CN: int, display_print = False) -> pd.DataFrame:
+    """Takes the events, precipitation data, nrcs temporal distribution, CN and applies the CN reduction method to
+    obtain a runoff curve for each recurrence interval. Also applies to events beyond published Atlas 14 values. 
+    """
+    runoff_distros1 = {}
+    prep_curves = pd.DataFrame(columns = hydro_events)
+    hyeto_graphs = np.where(df_weights_rainfall.index.to_numpy().astype(int)<1000, df_weights_rainfall.index.to_numpy().astype(int),  1000).tolist()
+    for event, hyetograph in zip(hydro_events, hyeto_graphs):
+        dist_df = get_hyeto_input_data_nrcs(nrcs_precip_table_dir, hyetograph, display_print)
+        dist_df['precip'] = dist_df['ratio']*df_weights_rainfall['P_Mean_in'].loc[event]
+        s = S_24hr(CN)
+        ia = IA_24hr(s)
+        runoff_distros1[event] = excess_precip(dist_df,ia, s)
+        prep_curves[event] = dist_df['hyeto_input']
+    return prep_curves
+    
+def precip_to_runoff_h3(hydro_events:np.ndarray ,nrcs_precip_table_dir: pl.WindowsPath,
+                     precip_data: pd.DataFrame,df_weights_rainfall: pd.DataFrame, display_print = False) -> pd.DataFrame:
+    """Takes the events, precipitation data, nrcs temporal distribution, selected CNs and applies the CN 
+    reduction method to obtain a runoff curve for each recurrence interval. 
+    """  
+    hyeto_graphs = np.where(hydro_events <1000, hydro_events, 1000).astype(int).tolist()
+    runoff_distros1 = {}
+    hydro_events = df_weights_rainfall.index.to_numpy().tolist()
+    prep_curves = pd.DataFrame(columns = hydro_events)
+    for event, hyetograph in zip(hydro_events, hyeto_graphs):
+        dist_df = get_hyeto_input_data_nrcs(nrcs_precip_table_dir, hyetograph, display_print)
+        dist_df['precip'] = dist_df['ratio']*df_weights_rainfall['Rainfall'].loc[event]
+        s = df_weights_rainfall['Avg. S'].loc[event]
+        ia = IA_24hr(s)
+        runoff_distros1[event] = excess_precip(dist_df,ia, s)
+        prep_curves[event] = dist_df['hyeto_input']
+    return prep_curves
+    
+def precip_to_runoff_h4(hydro_events:np.ndarray ,atlas14_precip_table_dir: pl.WindowsPath,
+                     precip_data: pd.DataFrame,df_weights_rainfall: pd.DataFrame, display_print = False) -> pd.DataFrame:
+    """Takes the events, precipitation data, atlas 14 temporal distribution, selected CNs and applies the 
+    CN reduction method to obtain a runoff curve for each recurrence interval. 
+    """  
+    Atlas14_hyetographs = ['q1', 'q2', 'q3', 'q4']
+    hyeto_graphs = np.where(hydro_events <1000, hydro_events, 1000).astype(int).tolist()
+    hydro_events = df_weights_rainfall.index.to_numpy().tolist()
+    column_names = []
+    
+    for event in hydro_events:
+        for hyetograph in Atlas14_hyetographs:
+            column_names.append(event+'_'+hyetograph)
+            
+    prep_curves = pd.DataFrame(columns = column_names)
+    prep_weights = pd.DataFrame(index = column_names, columns= ['Event Weight'])
+    
+    for event in hydro_events:
+        for  hyetograph in  Atlas14_hyetographs:
+            dist_df, weight_df = get_hyeto_input_data_atlas(atlas14_precip_table_dir, hyetograph, display_print)
+            dist_df['precip'] = dist_df[hyetograph]*df_weights_rainfall['Rainfall'].loc[event]
+            s = df_weights_rainfall['Avg. S'].loc[event]
+            ia = IA_24hr(s)
+            dist_df = excess_precip(dist_df,ia, s)
+            prep_curves[event+'_'+hyetograph] = dist_df['hyeto_input']
+            prep_weights['Event Weight'].loc[event+'_'+hyetograph] = df_weights_rainfall['Event Weight'][event]*weight_df['weight'][hyetograph]
+    return prep_curves, prep_weights
+
+def extend_time(prep_curves: pd.DataFrame,time_extend: float,time_step: float) -> pd.DataFrame:
+    """extends the hyetograph by a select period of time. the timestep is the spacing between
+       simulation intervals (typically 0.1 or 0.5 hours)
+    """
+    extend_curves = prep_curves.loc[0.0:time_extend]*0
+    extend_curves.index = extend_curves.index+(24+time_step)
+    return prep_curves.append(extend_curves).rename_axis('hours')
+
+def S_24hr(CN: int) -> float:
+    '''Calculates the potential maximum retention after runoff begins (S), in 
+       inches.
+    '''
+    return (1000-10*CN)/CN
+
+
+def IA_24hr(s24: float) -> float:
+    '''Calculats the inital abstraction (Ia) as a function of the maximum
+       potentail rention (S). Lim et al. (2006) suggest that a 5% ratio of 
+       Ia to S is more appropriate for urbanized areas instead of the more 
+       commonly used 20% ratio 
+       (https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1752-1688.2006.tb04481.x).
+    '''
+    return 0.2*s24
+
+def excess_precip(dist_df: pd.DataFrame,ia: float, s: float) -> pd.DataFrame:
+    '''Calculates runoff using the curve number approach for a dataframe. See equation 10-9
+       of NEH 630, Chapter 10
+       (https://www.wcc.nrcs.usda.gov/ftpref/wntsc/H&H/NEHhydrology/ch10.pdf) 
+    '''
+    dist_df['excess_precip'] = np.where(dist_df['precip']<= ia, 0, (np.square(dist_df['precip']-ia))/(dist_df['precip']-ia+s))
+    dist_df['hyeto_input'] = dist_df['excess_precip'].diff()
+    dist_df['hyeto_input'] = dist_df['hyeto_input'].fillna(0.0)
+    return dist_df

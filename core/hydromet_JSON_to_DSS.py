@@ -3,7 +3,7 @@ from hydromet import*
 
 #---------------------------------------------------------------------------#
 def main(forcing_dir: plib, outputs_dir: plib, bin_dir: plib, filename: str, 
-                jsonname: str, variable: str="Excess-Rainfall", data_type: str='INST-VAL', 
+                jsonname: str = '', variable: str="Excess-Rainfall", data_type: str='INST-VAL', 
                             scaling: bool=True, units: str='INCHES', remove_temp_files: bool=True, 
                                             display_print: bool=True) -> None:
     '''For each JSON within the forcing directory, the function extracts the
@@ -47,8 +47,8 @@ def main(forcing_dir: plib, outputs_dir: plib, bin_dir: plib, filename: str,
     if scaling is False:
         for file in forcing_dir.glob('*.json'):
             files.append(file)
-    if scaling is True:
-        files.append(pl.Path(forcing_dir)/pl.Path(jsonname))
+    else:
+        files.append(pl.Path(forcing_dir)/jsonname)
     for file in files:
         if display_print:
             print('Converting {} to DSS...'.format(file.name))
@@ -68,7 +68,10 @@ def main(forcing_dir: plib, outputs_dir: plib, bin_dir: plib, filename: str,
                 elif 'L' in BCN:
                     scen_name = '{0}_{1}_{2}'.format(pluv_domain, BCN, dur)                    
                 else:
-                    print(BCN, 'domain type not supported') 
+                    if scaling is True:
+                        scen_name = '{0}_{1}'.format(BCN, dur)
+                    else:
+                        print(BCN, 'domain type not supported') 
                 df = pd.DataFrame.from_dict(data[dur]['BCName'][BCN])
                 df[idx_ord] = idx
                 df = df.set_index(idx_ord)
