@@ -419,13 +419,11 @@ def precip_hyetograph_nrcs(df: pd.DataFrame) -> pd.DataFrame:
     low_12h = 4.0*df.loc['24h','value']*(1.0/36.0+2.0/9.0*df.loc['06h','value']/df.loc['24h','value'])
     up_12h = 2.0/3.0*df.loc['24h','value']*(5.0/6.0+2.0/3.0*df.loc['06h','value']/df.loc['24h','value'])
     if b < 0.0:
-        b=0.0
-    if a < 0.0:
         a=df2.at[9.0,'ratio']/81.0
-    if 18.0*a+b<0:
-        b=df2.at[9.0,'ratio']/4.5
+        b=0.0
     if 18.0*a+b<0:
         a=(-1.0*b/18.0)
+        b=df2.at[9.0,'ratio']/4.5       
     a2 = (9.0/10.5*df2.at[10.5,'ratio']-df2.at[9.0,'ratio'])/13.5
     b2 = (df2.at[9.0,'ratio']-81.0*a2)/9.0
     up_2 = 2.0*df.loc['24h','value']*(0.5-(df2.at[11.5, 'ratio']+3.0*df2.at[10.5, 'ratio'])/4.0)+0.01
