@@ -9,4 +9,4 @@ services:
       - "8888:8888"
     volumes:
       - ./:/home/jovyan/work
-      - /mnt/c/Users/sputnam/Documents/Projects/PFRA/PFRA_Production/Pluvial/CedarRapids/Outputs:/Outputs
+      - /mnt/c/Users/sputnam/OneDrive - Dewberry/Projects/FFRD/Cedar_Rapids:/Cedar_Rapids
