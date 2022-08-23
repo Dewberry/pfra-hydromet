@@ -1,7 +1,7 @@
 fiona == 1.8.4 
 geopandas == 0.4.0
 matplotlib == 3.1.1   
-nbconvert == 5.5.0 
+nbconvert == 6.5.1 
 nptyping == 0.2.0 
 numpy == 1.16.3
 pandas == 0.24.2
